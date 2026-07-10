@@ -6,7 +6,6 @@ import { useSession } from "next-auth/react";
 export function useMetadataSync(fileId: string | null) {
   const { data: session } = useSession();
   const [metadataList, setMetadataList] = useState<PdfMetadata[]>([]);
-  // @ts-expect-error: Suppress Dexie initialization warning
   const userId = session?.user?.id;
 
   // 1. 로컬(Dexie)에서 메타데이터 불러오기

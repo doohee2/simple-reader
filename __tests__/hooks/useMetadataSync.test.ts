@@ -26,7 +26,7 @@ jest.mock('@/lib/supabase', () => {
   const mUpsert = jest.fn().mockResolvedValue({ error: null });
   const mDelete = jest.fn().mockReturnThis();
   
-  const mChain = {
+  const mChain: any = {
     select: mSelect,
     upsert: mUpsert,
     delete: mDelete,
