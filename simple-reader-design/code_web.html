@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Simple Reader - Workspace</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Merriweather:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-background": "#e7e0ed",
+                      "on-error": "#690005",
+                      "surface-container-lowest": "#0f0d15",
+                      "background": "#15121b",
+                      "on-tertiary-container": "#3e2400",
+                      "on-surface-variant": "#cbc3d7",
+                      "surface-container-low": "#1d1a23",
+                      "on-primary-fixed": "#23005c",
+                      "inverse-primary": "#6d3bd7",
+                      "tertiary-fixed-dim": "#ffb95f",
+                      "surface-bright": "#3b3742",
+                      "primary-fixed-dim": "#d0bcff",
+                      "secondary": "#4edea3",
+                      "on-tertiary-fixed": "#2a1700",
+                      "tertiary": "#ffb95f",
+                      "on-secondary-container": "#00311f",
+                      "tertiary-fixed": "#ffddb8",
+                      "error-container": "#93000a",
+                      "secondary-fixed": "#6ffbbe",
+                      "surface-container-high": "#2c2832",
+                      "surface-container-highest": "#37333d",
+                      "on-primary-fixed-variant": "#5516be",
+                      "inverse-surface": "#e7e0ed",
+                      "primary": "#d0bcff",
+                      "on-secondary-fixed-variant": "#005236",
+                      "outline-variant": "#494454",
+                      "surface-variant": "#37333d",
+                      "surface-tint": "#d0bcff",
+                      "secondary-container": "#00a572",
+                      "on-secondary": "#003824",
+                      "on-primary": "#3c0091",
+                      "primary-fixed": "#e9ddff",
+                      "on-secondary-fixed": "#002113",
+                      "tertiary-container": "#ca8100",
+                      "on-primary-container": "#340080",
+                      "outline": "#958ea0",
+                      "error": "#ffb4ab",
+                      "secondary-fixed-dim": "#4edea3",
+                      "surface-dim": "#15121b",
+                      "on-tertiary": "#472a00",
+                      "primary-container": "#a078ff",
+                      "surface": "#15121b",
+                      "surface-container": "#211e27",
+                      "on-surface": "#e7e0ed",
+                      "on-tertiary-fixed-variant": "#653e00",
+                      "inverse-on-surface": "#322f39",
+                      "on-error-container": "#ffdad6"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "margin-mobile": "16px",
+                      "margin-desktop": "32px",
+                      "unit": "4px",
+                      "gutter": "16px",
+                      "container-max-width": "1440px",
+                      "sidebar-width": "280px"
+              },
+              "fontFamily": {
+                      "display-lg": [
+                              "Inter"
+                      ],
+                      "headline-lg": [
+                              "Inter"
+                      ],
+                      "ui-label-bold": [
+                              "Inter"
+                      ],
+                      "reading-body": [
+                              "Merriweather"
+                      ],
+                      "headline-sm": [
+                              "Inter"
+                      ],
+                      "ui-label-sm": [
+                              "Inter"
+                      ],
+                      "reading-body-mobile": [
+                              "Merriweather"
+                      ],
+                      "ui-body": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "display-lg": [
+                              "48px",
+                              {
+                                      "lineHeight": "56px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "ui-label-bold": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "reading-body": [
+                              "18px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-sm": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "ui-label-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "reading-body-mobile": [
+                              "16px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "ui-body": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+<style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #494454;
+            border-radius: 4px;
+        }
+        .resizer {
+            width: 4px;
+            cursor: col-resize;
+            background-color: transparent;
+            transition: background-color 0.2s;
+        }
+        .resizer:hover, .resizer:active {
+            background-color: #d0bcff;
+        }
+        
+        .streaming-cursor::after {
+            content: '|';
+            animation: blink 1s step-end infinite;
+        }
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background h-screen flex flex-col overflow-hidden font-ui-body text-ui-body">
+<!-- Top Navigation Header -->
+<header class="flex justify-between items-center w-full px-margin-desktop h-16 bg-surface border-b border-outline-variant flex-shrink-0 z-10">
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2">
+<span aria-hidden="true" class="material-symbols-outlined text-primary text-2xl">menu_book</span>
+<span class="font-headline-sm text-headline-sm font-bold text-primary tracking-tight hidden md:block">Simple Reader</span>
+</div>
+<div class="h-6 w-px bg-outline-variant mx-2 hidden md:block"></div>
+<div class="flex items-center gap-3">
+<span class="font-ui-label-bold text-ui-label-bold text-on-surface">The_Principles_of_Design.pdf</span>
+<div class="flex items-center gap-1 bg-secondary-container/20 border border-secondary/30 px-2 py-0.5 rounded-full">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></span>
+<span class="font-ui-label-sm text-ui-label-sm text-secondary uppercase tracking-wider">동기화 중...</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors duration-200 rounded-full hover:bg-surface-variant">
+<span class="material-symbols-outlined">light_mode</span>
+</button>
+<button class="px-4 py-2 bg-surface-variant text-on-surface hover:bg-surface-bright border border-outline-variant rounded-md font-ui-label-bold text-ui-label-bold transition-colors">
+                파일 닫기
+            </button>
+<button class="p-1 rounded-full border-2 border-outline-variant hover:border-primary transition-colors">
+<img alt="User Profile" class="w-8 h-8 rounded-full object-cover" data-alt="A small, circular avatar portrait of a modern professional, minimalist style, dark mode background, subtle lighting, professional headshot in an abstract setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAamKZAf-8mShOI8KkmMoHkgg-iQzPcPvAXz6zq9fje8ilJbasYonAuAphpIS_VGcPnFJsCfD9Y3ubyS3CPio30PCw7nqzYl-ljCrFVZ6Bvy9T-ry74F6e40u1rHjR1lViqG3JcbvCz7mHgD0srANWb1XansSX_SXuc-vizyW8h3XiSbXKpV5rWnj_yLK0RvYwqA49-nk5m3aqrrKTkY8VzMvnq9v6nwHeCzWFMxHlKlo9O2cdH1aSL"/>
+</button>
+</div>
+</header>
+<!-- Main Workspace -->
+<main class="flex-1 flex overflow-hidden">
+<!-- Left Panel: Reader (70%) -->
+<section class="flex-1 flex flex-col min-w-[300px] bg-surface-container-lowest relative">
+<!-- Toolbar -->
+<div class="h-12 bg-surface-container-low border-b border-outline-variant flex items-center justify-between px-4 flex-shrink-0">
+<div class="flex items-center gap-2">
+<button class="p-1.5 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-variant transition-colors" title="이전 페이지">
+<span class="material-symbols-outlined text-xl">chevron_left</span>
+</button>
+<span class="font-ui-label-bold text-ui-label-bold text-on-surface-variant w-16 text-center">1 / 48</span>
+<button class="p-1.5 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-variant transition-colors" title="다음 페이지">
+<span class="material-symbols-outlined text-xl">chevron_right</span>
+</button>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 bg-surface-container px-2 py-1 rounded">
+<button class="p-1 text-on-surface-variant hover:text-on-surface" title="축소"><span class="material-symbols-outlined text-[18px]">remove</span></button>
+<span class="font-ui-label-sm text-ui-label-sm text-on-surface w-10 text-center">100%</span>
+<button class="p-1 text-on-surface-variant hover:text-on-surface" title="확대"><span class="material-symbols-outlined text-[18px]">add</span></button>
+</div>
+<button class="p-1.5 rounded text-primary bg-primary/10 hover:bg-primary/20 transition-colors" title="책갈피">
+<span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">bookmark</span>
+</button>
+</div>
+</div>
+<!-- PDF Canvas -->
+<div class="flex-1 overflow-auto custom-scrollbar p-8 flex justify-center bg-surface-dim">
+<!-- Mock PDF Page -->
+<div class="bg-white w-full max-w-[800px] min-h-[1100px] shadow-2xl relative p-12 text-black font-reading-body">
+<h1 class="text-4xl font-bold mb-8 font-headline-lg font-serif">1. Introduction to Design Systems</h1>
+<img alt="Diagram" class="w-full h-64 object-cover mb-8 rounded" data-alt="A clean, minimalist vector diagram showing a component hierarchy with interconnected nodes, using a strict black and white color palette, professional technical drawing style, suitable for a textbook illustration." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD1t0gO3uBo_IRbOoWQUwOGsrF2EZrk0MIceQblk-zxrtnDmq2x1nXSa7rfdTxmUE9Vi43lUaRmszTQGN3C6QOgpPgr-zurAP8sxe-JV5Z8b9phVEtwY99Hh5ye9HLRkVr-XIayKuja8zF5OUSlRS4kw2lgrVfTqZffdhcy5NDSsAOLjdwBcd6wISDm37puq2U2XP0hdvr4mP9tJcHhgSY18rTaUp50cNilwPbmNvbhRgyBCtZhXosn"/>
+<p class="mb-6 leading-relaxed text-gray-800">
+                        A design system is a collection of reusable components, guided by clear standards, that can be assembled together to build any number of applications.
+                    </p>
+<!-- Selected Text Area -->
+<div class="relative inline-block mb-6">
+<p class="leading-relaxed bg-primary/20 text-black px-1 rounded inline-block shadow-[0_0_8px_rgba(208,188,255,0.4)] transition-all">
+                            Design is not just what it looks like and feels like. Design is how it works.
+                        </p>
+<!-- Floating Tooltip -->
+<div class="absolute -top-14 left-1/2 transform -translate-x-1/2 bg-surface border border-primary/50 shadow-[0_4px_12px_rgba(0,0,0,0.5)] rounded-lg p-1.5 flex items-center gap-1 z-20 backdrop-blur-md">
+<button class="flex items-center gap-1.5 px-3 py-1.5 rounded-md hover:bg-surface-variant text-primary font-ui-label-bold text-ui-label-sm transition-colors">
+<span>✨</span>
+<span>AI 번역</span>
+</button>
+<div class="w-px h-4 bg-outline-variant mx-1"></div>
+<button class="flex items-center gap-1.5 px-3 py-1.5 rounded-md hover:bg-surface-variant text-on-surface-variant font-ui-label-bold text-ui-label-sm transition-colors">
+<span>📝</span>
+<span>메모 추가</span>
+</button>
+<!-- Tooltip Arrow -->
+<div class="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-primary/50"></div>
+</div>
+</div>
+<p class="mb-6 leading-relaxed text-gray-800">
+                        This principle emphasizes that true aesthetic value stems from functional utility. When components are designed with clear intent, the overall system becomes both robust and elegant.
+                    </p>
+</div>
+</div>
+</section>
+<!-- Resize Handle -->
+<div class="resizer relative z-30" id="drag-handle">
+<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-1 h-8 rounded-full bg-outline-variant"></div>
+</div>
+<!-- Right Panel: AI & Metadata (30%) -->
+<section class="w-[380px] min-w-[280px] bg-surface flex flex-col border-l border-outline-variant shrink-0">
+<!-- Tabs -->
+<div class="flex border-b border-outline-variant px-2 pt-2 gap-4">
+<button class="pb-3 px-2 font-ui-label-bold text-ui-label-bold text-primary border-b-2 border-primary relative">
+                    AI 번역·요약
+                </button>
+<button class="pb-3 px-2 font-ui-label-bold text-ui-label-bold text-on-surface-variant hover:text-on-surface transition-colors">
+                    메모·책갈피
+                </button>
+</div>
+<!-- Tab Content -->
+<div class="flex-1 overflow-y-auto custom-scrollbar p-6 flex flex-col gap-6">
+<!-- Source Quote -->
+<div class="flex flex-col gap-2">
+<span class="font-ui-label-sm text-ui-label-sm text-on-surface-variant uppercase tracking-wider">선택된 문장</span>
+<div class="bg-surface-container-low border-l-2 border-outline-variant p-4 rounded-r-lg">
+<p class="font-reading-body text-reading-body text-on-surface italic text-sm">
+                            "Design is not just what it looks like and feels like. Design is how it works."
+                        </p>
+</div>
+</div>
+<!-- Action Area -->
+<div class="flex justify-between items-center">
+<button class="flex items-center gap-2 bg-secondary text-on-secondary px-4 py-2 rounded font-ui-label-bold text-ui-label-bold hover:bg-secondary-fixed transition-colors shadow-md">
+<span class="material-symbols-outlined text-sm">translate</span>
+                        한국어로 번역
+                    </button>
+<button class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-variant rounded-full transition-colors">
+<span class="material-symbols-outlined text-sm">more_horiz</span>
+</button>
+</div>
+<!-- AI Result Box -->
+<div class="bg-primary/5 border border-primary/20 rounded-xl p-5 flex flex-col gap-4 relative mt-2 shadow-[inset_0_0_20px_rgba(208,188,255,0.05)]">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-sm">auto_awesome</span>
+<span class="font-ui-label-bold text-ui-label-sm text-primary">제미나이 번역</span>
+</div>
+<p class="font-ui-body text-ui-body text-on-surface leading-relaxed streaming-cursor">
+                        디자인은 단순히 어떻게 보이고 느껴지는가의 문제가 아닙니다. 디자인은 그것이 어떻게 작동하는가입니다.
+                    </p>
+<div class="w-full h-px bg-outline-variant/30 my-2"></div>
+<button class="flex items-center justify-center gap-2 w-full py-2 border border-outline-variant rounded hover:bg-surface-variant text-on-surface transition-colors font-ui-label-bold text-ui-label-bold">
+<span class="material-symbols-outlined text-sm">save</span>
+                        메모로 저장
+                    </button>
+</div>
+</div>
+</section>
+</main>
+<script>
+        // Simple resize logic for the panels
+        const resizer = document.getElementById('drag-handle');
+        const rightPanel = resizer.nextElementSibling;
+        const mainLayout = resizer.parentElement;
+        
+        let isResizing = false;
+
+        resizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            document.body.style.cursor = 'col-resize';
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            const containerWidth = mainLayout.getBoundingClientRect().width;
+            const newRightWidth = containerWidth - e.clientX;
+            
+            // Constrain width
+            if (newRightWidth > 280 && newRightWidth < containerWidth * 0.5) {
+                rightPanel.style.width = `${newRightWidth}px`;
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            isResizing = false;
+            document.body.style.cursor = 'default';
+        });
+    </script>
+</body></html>

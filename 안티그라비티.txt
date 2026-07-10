@@ -1,0 +1,55 @@
+우리는 구글 드라이브의 PDF 파일을 로컬 캐시로 불러와 읽으며, 드래그한 텍스트를 제미나이 AI로 번역하고 책갈피/메모 메타데이터를 Supabase와 연동하는 PWA 기반 스마트 독서 앱 'Simple Reader' (한글 명칭: "이북 리더기") 웹앱을 개발할 거야.
+기술 스택은 Next.js (App Router), TypeScript, Tailwind CSS, NextAuth.js(Google OAuth), `@serwist/next`(PWA), `react-pdf`, `react-resizable-panels`, `Dexie.js`(IndexedDB 기반 관계형 스토리지), Supabase JS Client, `@google/genai`를 사용해 줘.
+내가 스티치(Stitch)를 통해 생성한 프론트엔드 UI 코드를 첨부할 테니, 이를 프로젝트에 이식하고 아래 마일스톤에 따라 실제 백엔드 라우트 및 하이브리드 데이터 동기화 엔진을 바인딩해 줘.
+
+---
+
+### [Phase 1: 프로젝트 세팅 및 스티치 UI 컴포넌트 이식]
+1. Next.js 프로젝트를 초기화하고 PWA(`manifest.json`, Serwist 오프라인 지원) 세팅을 마쳐 줘.
+2. 첨부된 스티치 UI 코드를 바탕으로 레이아웃과 분할 창(`react-resizable-panels`) 구조를 세팅하고, 컴포넌트를 모듈화(`components/Header`, `components/PdfViewer`, `components/AiAssistantPanel` 등)해 줘.
+
+### [Phase 2: 구글 드라이브 API 연동 및 PDF 로컬 캐싱 엔진]
+1. NextAuth.js로 구글 OAuth 로그인을 구현하고 `https://www.googleapis.com/auth/drive.readonly` 권한을 받아 줘. (사내 방화벽을 고려해 Google Picker iframe은 절대 사용 금지)
+2. 커스텀 드라이브 탐색기 모달을 통해 사용자가 선택한 PDF 파일(`fileId`)을 가져오는 `/api/drive/download` 라우트를 만들어 줘.
+3. [PDF 캐싱 로직]: 다운로드한 PDF 바이너리(Blob/ArrayBuffer)는 브라우저의 `Dexie.js`에 `fileId`를 키값으로 영구 캐싱해 줘. 다음 접속 시 온라인 다운로드를 건너뛰고 로컬 캐시에서 0.1초 만에 로드하여 `react-pdf`에 공급해 줘.
+
+### [Phase 3: react-pdf 뷰어 텍스트 추출 및 분할 창 바인딩]
+1. `react-pdf`를 도입하되, 사용자가 문서를 드래그하여 텍스트를 선택할 수 있도록 `renderTextLayer={true}` 설정을 반드시 활성화해 줘.
+2. 사용자가 텍스트를 드래그하면 선택된 문자열(`window.getSelection()`)과 현재 페이지 번호(`currentPage`)를 상태(State)로 캡처하고, 우측 AI 어시스턴트 패널의 '원본 텍스트' 영역으로 즉시 전달해 줘.
+3. 페이지를 전환하거나 다른 영역을 클릭할 때, 이전 페이지에서 선택되었던 잔여 텍스트 영역이 브라우저에 남아 오류를 일으키지 않도록 `window.getSelection()?.removeAllRanges()`를 호출하여 선택 상태를 명확히 초기화하는 클린업 로직을 포함해 줘.
+
+### [Phase 4: 제미나이(Gemini) API 스트리밍 번역 라우트]
+1. API 키 노출 방지를 위해 백엔드 API Route(`/api/translate/route.ts`)를 신설하고 `@google/genai` SDK를 사용해 줘.
+2. 프론트엔드에서 선택된 텍스트와 요청 모드('번역' 또는 '요약')를 전달하면, 제미나이 모델(`gemini-2.5-flash`)이 한국어로 번역/요약한 결과를 HTTP 스트리밍(Streaming Response) 방식으로 우측 패널에 실시간 출력하게 해 줘.
+
+### [Phase 5: 하이브리드 JSON 메타데이터 동기화 (핵심 ⭐️)]
+책갈피와 메모 데이터를 JSON 형태로 로컬 DB와 Supabase에 양방향 동기화하는 커스텀 훅 `useMetadataSync`를 구현해 줘.
+
+1. [메타데이터 JSON 스키마]:
+{
+  "id": "UUID",
+  "fileId": "Google_Drive_File_ID",
+  "page": 5,
+  "type": "bookmark | memo",
+  "selectedText": "드래그했던 원본 텍스트",
+  "content": "사용자가 작성한 메모 내용 또는 AI 번역문",
+  "updatedAt": "2026-07-08T09:30:00Z"
+}
+
+2. [로컬 우선(Local-First) 저장]: 책갈피를 추가하거나 메모를 저장하면 화면 지연 없이 즉시 브라우저 로컬 DB(`Dexie.js`)에 해당 JSON 레코드를 저장/업데이트해 줘.
+
+3. [Supabase 백엔드 동기화]:
+   - Supabase의 `pdf_metadata` 테이블(컬럼: `user_id`, `file_id`, `metadata_json`, `updated_at`)과 연동해 줘. 효율적인 관리를 위해 파일 1개(`file_id`)당 1개의 Row만 생성하고, 모든 메모/책갈피 배열을 통째로 `JSONB` 데이터 타입 컬럼(`metadata_json`)에 넣어 관리하는 방식을 사용해 줘.
+   - 온라인 상태일 때 로컬 DB의 JSON 배열 변경 사항을 백그라운드에서 Supabase로 UPSERT(전송)해 줘.
+   - 앱 최초 실행 시 Supabase의 최신 JSON 메타데이터를 가져와 로컬 DB와 병합(Merge - `updatedAt` 기준 최신 우선)하여 다른 기기에서의 독서 기록을 그대로 이어받을 수 있게 해 줘.
+
+---
+
+[지시 사항]
+우선 프로젝트의 simple-reader-design폴더에 첨부된 스티치 UI 코드와 스크립샷을 분석해줘. code_web.html 과 screen_web.png 파일이 PC 브라우저 환경의 화면 구성이고, code_mobile.html 과 screen_mobile.png 파일은 모바일 환경의 화면 구성이야. DESIGN.md 의 컬러 배색을 기준으로 다크모드와 라이트모드의 색상을 정하고, simple_reader_icon.png 을 기준으로 PWA 앱 아이콘을 리사이즈해서 만들어줘.
+이 디자인들을 참고하여 Phase 3(react-pdf 텍스트 레이어 제어)와 Phase 5(JSON 메타데이터 동기화 아키텍처)의 설계 전략을 간단히 보고해 줘. 내 승인이 떨어지면 Phase 1부터 개발을 시작해 줘.
+
+## 💡 개발 성공을 위한 핵심 팁 (트러블슈팅 예방)
+
+1. **react-pdf 설정**: Next.js 서버 사이드 렌더링(SSR) 환경에서 Webpack 모듈 충돌이나 `pdf.worker.js` 경로 오류를 방지하기 위해, react-pdf 컴포넌트는 무조건 `next/dynamic`을 사용하여 SSR을 끄고(`ssr: false`) 클라이언트 전용으로 렌더링하도록 코드를 구조화해 줘.
+2. **텍스트 선택 이벤트 독립성**: PDF 뷰어 페이지를 전환할 때 이전 페이지의 선택 영역이 충돌하는 문제를 막기 위해 페이지 체인지 핸들러 내부에서 상태 클린업이 철저히 수행되도록 연동해 줘.

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Simple Reader - Mobile View</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Merriweather:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                            "on-background": "#e7e0ed",
+                            "on-error": "#690005",
+                            "surface-container-lowest": "#0f0d15",
+                            "background": "#15121b",
+                            "on-tertiary-container": "#3e2400",
+                            "on-surface-variant": "#cbc3d7",
+                            "surface-container-low": "#1d1a23",
+                            "on-primary-fixed": "#23005c",
+                            "inverse-primary": "#6d3bd7",
+                            "tertiary-fixed-dim": "#ffb95f",
+                            "surface-bright": "#3b3742",
+                            "primary-fixed-dim": "#d0bcff",
+                            "secondary": "#4edea3",
+                            "on-tertiary-fixed": "#2a1700",
+                            "tertiary": "#ffb95f",
+                            "on-secondary-container": "#00311f",
+                            "tertiary-fixed": "#ffddb8",
+                            "error-container": "#93000a",
+                            "secondary-fixed": "#6ffbbe",
+                            "surface-container-high": "#2c2832",
+                            "surface-container-highest": "#37333d",
+                            "on-primary-fixed-variant": "#5516be",
+                            "inverse-surface": "#e7e0ed",
+                            "primary": "#d0bcff",
+                            "on-secondary-fixed-variant": "#005236",
+                            "outline-variant": "#494454",
+                            "surface-variant": "#37333d",
+                            "surface-tint": "#d0bcff",
+                            "secondary-container": "#00a572",
+                            "on-secondary": "#003824",
+                            "on-primary": "#3c0091",
+                            "primary-fixed": "#e9ddff",
+                            "on-secondary-fixed": "#002113",
+                            "tertiary-container": "#ca8100",
+                            "on-primary-container": "#340080",
+                            "outline": "#958ea0",
+                            "error": "#ffb4ab",
+                            "secondary-fixed-dim": "#4edea3",
+                            "surface-dim": "#15121b",
+                            "on-tertiary": "#472a00",
+                            "primary-container": "#a078ff",
+                            "surface": "#15121b",
+                            "surface-container": "#211e27",
+                            "on-surface": "#e7e0ed",
+                            "on-tertiary-fixed-variant": "#653e00",
+                            "inverse-on-surface": "#322f39",
+                            "on-error-container": "#ffdad6"
+                    },
+                    "borderRadius": {
+                            "DEFAULT": "0.125rem",
+                            "lg": "0.25rem",
+                            "xl": "0.5rem",
+                            "full": "0.75rem"
+                    },
+                    "spacing": {
+                            "margin-mobile": "16px",
+                            "margin-desktop": "32px",
+                            "unit": "4px",
+                            "gutter": "16px",
+                            "container-max-width": "1440px",
+                            "sidebar-width": "280px"
+                    },
+                    "fontFamily": {
+                            "display-lg": ["Inter"],
+                            "headline-lg": ["Inter"],
+                            "ui-label-bold": ["Inter"],
+                            "reading-body": ["Merriweather"],
+                            "headline-sm": ["Inter"],
+                            "ui-label-sm": ["Inter"],
+                            "reading-body-mobile": ["Merriweather"],
+                            "ui-body": ["Inter"]
+                    },
+                    "fontSize": {
+                            "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                            "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                            "ui-label-bold": ["14px", {"lineHeight": "20px", "fontWeight": "600"}],
+                            "reading-body": ["18px", {"lineHeight": "32px", "fontWeight": "400"}],
+                            "headline-sm": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                            "ui-label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                            "reading-body-mobile": ["16px", {"lineHeight": "28px", "fontWeight": "400"}],
+                            "ui-body": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background h-screen overflow-hidden flex flex-col font-ui-body">
+<!-- Top Navigation (Mobile Simplified) -->
+<header class="flex justify-between items-center w-full px-margin-mobile h-16 bg-surface border-b border-outline-variant z-10 shrink-0">
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+<div class="flex flex-col items-center flex-1 mx-4 overflow-hidden">
+<h1 class="font-ui-label-bold text-ui-label-bold text-on-surface truncate w-full text-center">Quantum_Entanglement_Paper.pdf</h1>
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px]" data-icon="cloud_done">cloud_done</span>
+<span class="font-ui-label-sm text-ui-label-sm uppercase">동기화 완료</span>
+</div>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</header>
+<!-- Main Content Canvas (PDF Viewer) -->
+<main class="flex-1 relative overflow-hidden bg-surface-container-lowest">
+<!-- Pseudo PDF Content Area -->
+<div class="w-full h-full overflow-y-auto px-margin-mobile py-6 pb-48 font-reading-body-mobile text-on-background bg-slate-50 dark:bg-slate-900 shadow-inner">
+<div class="max-w-2xl mx-auto space-y-6">
+<h2 class="font-headline-sm text-headline-sm text-on-background font-bold">1. Introduction to Quantum Entanglement</h2>
+<p>
+                    Quantum entanglement is a physical phenomenon that occurs when a group of particles are generated, interact, or share spatial proximity in a way such that the quantum state of each particle of the group cannot be described independently of the state of the others, including when the particles are separated by a large distance.
+                </p>
+<p>
+                    The topic of quantum entanglement is at the heart of the disparity between classical and quantum physics: entanglement is a primary feature of quantum mechanics lacking in classical mechanics.
+                </p>
+<!-- Selected Text Simulation -->
+<div class="bg-primary/20 border-l-2 border-primary px-3 py-2 rounded-r-DEFAULT my-4 relative">
+<p class="text-primary-fixed-dim">Measurements of physical properties such as position, momentum, spin, and polarization performed on entangled particles can be found to be perfectly correlated.</p>
+<!-- Selection Context Menu (Tooltip) -->
+<div class="absolute -top-12 left-1/2 -translate-x-1/2 bg-surface-container-high border border-outline-variant rounded-lg shadow-lg flex items-center p-1 gap-1 z-20">
+<button class="p-2 text-on-surface hover:text-primary hover:bg-surface-variant rounded transition-colors"><span class="material-symbols-outlined text-[20px]" data-icon="format_ink_highlighter">format_ink_highlighter</span></button>
+<button class="p-2 text-primary hover:bg-surface-variant rounded transition-colors bg-surface-variant"><span class="material-symbols-outlined text-[20px]" data-icon="g_translate">g_translate</span></button>
+<button class="p-2 text-on-surface hover:text-primary hover:bg-surface-variant rounded transition-colors"><span class="material-symbols-outlined text-[20px]" data-icon="content_copy">content_copy</span></button>
+</div>
+</div>
+<p>
+                    For example, if a pair of entangled particles is generated such that their total spin is known to be zero, and one particle is found to have clockwise spin on a certain axis, the spin of the other particle, measured on the same axis, is found to be anticlockwise.
+                </p>
+</div>
+</div>
+<!-- Floating Action Button (Bookmark) -->
+<button class="absolute bottom-[100px] right-margin-mobile w-12 h-12 bg-primary text-on-primary rounded-full shadow-lg flex items-center justify-center hover:bg-primary-container transition-transform active:scale-95 z-30">
+<span class="material-symbols-outlined" data-icon="bookmark_add">bookmark_add</span>
+</button>
+</main>
+<!-- AI Assistant Bottom Sheet (Partially Pulled Up) -->
+<div class="absolute bottom-16 left-0 w-full bg-surface-container-high rounded-t-xl border-t border-outline-variant shadow-2xl flex flex-col z-40 transition-transform duration-300 ease-in-out transform translate-y-0 h-1/3 min-h-[250px]">
+<!-- Drag Handle -->
+<div class="w-full flex justify-center py-3 cursor-grab active:cursor-grabbing">
+<div class="w-12 h-1 bg-outline-variant rounded-full hover:bg-primary transition-colors"></div>
+</div>
+<div class="px-margin-mobile pb-margin-mobile flex-1 flex flex-col overflow-hidden">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-primary" data-icon="auto_awesome">auto_awesome</span>
+<h3 class="font-ui-label-bold text-ui-label-bold text-on-surface">AI 번역</h3>
+</div>
+<div class="flex-1 overflow-y-auto mb-4 bg-surface-container rounded-lg p-3 border border-outline-variant/50">
+<p class="font-ui-body text-ui-body text-on-surface-variant">
+<span class="italic block mb-2 text-on-surface opacity-70">"Measurements of physical properties such as position, momentum, spin, and polarization performed on entangled particles can be found to be perfectly correlated."</span>
+<strong>Translation (Spanish):</strong> Las mediciones de propiedades físicas como posición, momento, espín y polarización realizadas en partículas entrelazadas pueden resultar perfectamente correlacionadas.
+                </p>
+</div>
+<div class="flex justify-end gap-3 mt-auto shrink-0">
+<button class="px-4 py-2 font-ui-label-bold text-ui-label-bold text-primary hover:bg-surface-variant rounded-lg transition-colors border border-outline-variant">복사</button>
+<button class="px-4 py-2 font-ui-label-bold text-ui-label-bold bg-primary text-on-primary hover:bg-primary-container rounded-lg transition-colors shadow-sm flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]" data-icon="save">save</span>
+                    메모 저장
+                </button>
+</div>
+</div>
+</div>
+<!-- BottomNavBar (Shared Component JSON logic) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-3 md:hidden bg-surface-container-highest shadow-lg rounded-t-full pb-[env(safe-area-inset-bottom)]">
+<!-- Read (Active based on context) -->
+<button class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-full px-4 py-1 hover:bg-surface-variant transition-colors opacity-80 scale-95 transition-all">
+<span class="material-symbols-outlined" data-icon="description" data-weight="fill">description</span>
+<span class="font-ui-label-sm text-ui-label-sm mt-1">읽기</span>
+</button>
+<!-- AI Tools (Inactive) -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1 hover:text-primary transition-colors duration-200">
+<span class="material-symbols-outlined" data-icon="smart_toy">smart_toy</span>
+<span class="font-ui-label-sm text-ui-label-sm mt-1">AI 도구</span>
+</button>
+<!-- Notes (Inactive) -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1 hover:text-primary transition-colors duration-200">
+<span class="material-symbols-outlined" data-icon="edit_note">edit_note</span>
+<span class="font-ui-label-sm text-ui-label-sm mt-1">메모</span>
+</button>
+<!-- Library (Inactive) -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1 hover:text-primary transition-colors duration-200">
+<span class="material-symbols-outlined" data-icon="folder_open">folder_open</span>
+<span class="font-ui-label-sm text-ui-label-sm mt-1">서재</span>
+</button>
+</nav>
+</body></html>
