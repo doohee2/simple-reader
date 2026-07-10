@@ -11,7 +11,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const driveApiUrl = `https://www.googleapis.com/drive/v3/files?q=mimeType='application/pdf' and trashed=false&fields=files(id, name, modifiedTime, size)&orderBy=modifiedTime desc`;
+    const { searchParams } = new URL(request.url);
+    const folderId = searchParams.get("folderId") || "root";
+
+    const query = `'${folderId}' in parents and (mimeType='application/vnd.google-apps.folder' or mimeType='application/pdf') and trashed=false`;
+    const fields = "files(id, name, modifiedTime, size, mimeType)";
+    
+    const driveApiUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=${encodeURIComponent(fields)}&orderBy=folder,modifiedTime desc`;
 
     const response = await fetch(driveApiUrl, {
       method: "GET",
