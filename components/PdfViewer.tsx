@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
-import "react-pdf/dist/esm/Page/AnnotationLayer.css";
-import "react-pdf/dist/esm/Page/TextLayer.css";
+import "react-pdf/dist/Page/AnnotationLayer.css";
+import "react-pdf/dist/Page/TextLayer.css";
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Bookmark, Loader2 } from "lucide-react";
 import { useStore } from "@/store/useStore";
 import { usePdfFile } from "@/hooks/usePdfFile";
