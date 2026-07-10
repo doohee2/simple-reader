@@ -14,7 +14,7 @@ const merriweather = Merriweather({
 });
 
 export const metadata: Metadata = {
-  title: "Simple Reader",
+  title: "eBook 리더기",
   description: "PWA Smart Reading App with Gemini AI",
   manifest: "/manifest.json",
   icons: {

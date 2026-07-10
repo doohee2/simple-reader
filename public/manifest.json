@@ -1,6 +1,6 @@
 {
-  "name": "Simple Reader",
-  "short_name": "SimpleReader",
+  "name": "eBook 리더기",
+  "short_name": "eBook 리더기",
   "description": "PWA-based smart reading app with Gemini AI translation",
   "start_url": "/",
   "display": "standalone",
