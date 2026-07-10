@@ -10,7 +10,7 @@ import { usePdfFile } from "@/hooks/usePdfFile";
 import { useMetadataSync } from "@/hooks/useMetadataSync";
 
 // 워커 설정 (CDN 방식)
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
 
 export default function PdfViewer() {
   const { selectedFileId, setSelectedText, clearSelectedText } = useStore();
