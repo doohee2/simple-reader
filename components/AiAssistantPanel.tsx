@@ -14,11 +14,12 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
 
   useEffect(() => {
     if (forceTab) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveTab(forceTab);
     }
   }, [forceTab]);
 
-  const { selectedFileId, selectedText, currentPage } = useStore();
+  const { selectedFileId, selectedText, currentPage, actionIntent, clearActionIntent } = useStore();
   
   const [translationResult, setTranslationResult] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
@@ -28,6 +29,24 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
+
+  const [isAddingMemo, setIsAddingMemo] = useState(false);
+  const [newMemoContent, setNewMemoContent] = useState("");
+
+  // actionIntent 감지 (툴팁에서 액션 발생 시)
+  useEffect(() => {
+    if (actionIntent === "translate") {
+      setActiveTab("ai");
+      clearActionIntent();
+      handleTranslate("translate");
+    } else if (actionIntent === "memo") {
+      setActiveTab("memo");
+      setIsAddingMemo(true);
+      setNewMemoContent("");
+      clearActionIntent();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actionIntent]);
 
   const handleStartEdit = (id: string, content: string) => {
     setEditingId(id);
@@ -83,8 +102,8 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
           setTranslationResult((prev) => prev + chunk);
         }
       }
-    } catch (err: any) {
-      setError(err.message || "번역 중 오류가 발생했습니다.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "번역 중 오류가 발생했습니다.");
     } finally {
       setIsTranslating(false);
     }
@@ -205,6 +224,58 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
         
         {activeTab === "memo" && (
           <div className="flex flex-col gap-4">
+            {/* 새 메모 작성 UI */}
+            {isAddingMemo ? (
+              <div className="bg-surface-container border border-primary/50 rounded-xl p-4 flex flex-col gap-3 shadow-md">
+                <div className="flex items-center justify-between border-b border-outline-variant pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-primary text-[10px] bg-primary/10 px-1.5 py-0.5 rounded font-bold">새 메모</span>
+                    <span className="text-on-surface-variant text-xs">Page {currentPage}</span>
+                  </div>
+                </div>
+                {selectedText && (
+                  <div className="border-l-2 border-outline-variant pl-3">
+                    <p className="text-sm text-on-surface-variant italic line-clamp-2">
+                      &quot;{selectedText}&quot;
+                    </p>
+                  </div>
+                )}
+                <textarea
+                  value={newMemoContent}
+                  onChange={(e) => setNewMemoContent(e.target.value)}
+                  placeholder="메모 내용을 입력하세요..."
+                  className="w-full bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface resize-none focus:outline-none focus:border-primary"
+                  rows={3}
+                  autoFocus
+                />
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => setIsAddingMemo(false)} className="px-3 py-1.5 text-sm text-on-surface-variant hover:text-error hover:bg-surface-variant rounded transition-colors">
+                    취소
+                  </button>
+                  <button 
+                    onClick={async () => {
+                      if (newMemoContent.trim() || selectedText) {
+                        await saveMetadata(currentPage, "memo", selectedText, newMemoContent.trim());
+                      }
+                      setIsAddingMemo(false);
+                      setNewMemoContent("");
+                    }} 
+                    className="px-3 py-1.5 text-sm bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container rounded transition-colors font-ui-label-bold"
+                  >
+                    저장
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button 
+                onClick={() => setIsAddingMemo(true)}
+                className="w-full py-3 border border-dashed border-outline-variant rounded-xl text-on-surface-variant hover:bg-surface-variant hover:text-primary transition-colors flex items-center justify-center gap-2 font-ui-label-bold"
+              >
+                <span className="material-symbols-outlined text-[18px]">add</span>
+                새 메모 작성하기
+              </button>
+            )}
+
             {metadataList.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 text-on-surface-variant">
                 <p>저장된 메모나 책갈피가 없습니다.</p>

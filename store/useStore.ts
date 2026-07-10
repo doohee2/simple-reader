@@ -23,6 +23,11 @@ interface StoreState {
   // 구글 드라이브 피커 모달 상태
   isDrivePickerOpen: boolean;
   setIsDrivePickerOpen: (isOpen: boolean) => void;
+
+  // 플로팅 툴팁 액션 의도 전달용
+  actionIntent: "translate" | "summary" | "memo" | null;
+  setActionIntent: (intent: "translate" | "summary" | "memo" | null) => void;
+  clearActionIntent: () => void;
 }
 
 export const useStore = create<StoreState>()(
@@ -45,6 +50,10 @@ export const useStore = create<StoreState>()(
 
   isDrivePickerOpen: false,
   setIsDrivePickerOpen: (isOpen) => set({ isDrivePickerOpen: isOpen }),
+
+  actionIntent: null,
+  setActionIntent: (intent) => set({ actionIntent: intent }),
+  clearActionIntent: () => set({ actionIntent: null }),
     }),
     {
       name: 'simple-reader-storage',

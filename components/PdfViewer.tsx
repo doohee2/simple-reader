@@ -13,7 +13,7 @@ const workerExt = (pdfjs.version || "3.").startsWith("3.") ? "min.js" : "mjs";
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version || "3.11.174"}/build/pdf.worker.${workerExt}`;
 
 export default function PdfViewer() {
-  const { selectedFileId, setSelectedText, clearSelectedText } = useStore();
+  const { selectedFileId, setSelectedText, clearSelectedText, setActionIntent } = useStore();
   const { fileData, isLoading, error } = usePdfFile(selectedFileId);
 
   const [numPages, setNumPages] = useState<number>(0);
@@ -82,10 +82,17 @@ export default function PdfViewer() {
   const zoomIn = () => setScale((s) => Math.min(s + 0.2, 3.0));
   const zoomOut = () => setScale((s) => Math.max(s - 0.2, 0.5));
 
-  // 책갈피 저장
-  const { saveMetadata } = useMetadataSync(selectedFileId);
-  const handleAddBookmark = () => {
-    saveMetadata(pageNumber, "bookmark", "", `페이지 ${pageNumber} 책갈피`);
+  // 책갈피 저장/해제 (Toggle)
+  const { metadataList, saveMetadata, deleteMetadata } = useMetadataSync(selectedFileId);
+  const existingBookmark = metadataList.find(m => m.page === pageNumber && m.type === "bookmark");
+  const isBookmarked = !!existingBookmark;
+
+  const handleToggleBookmark = () => {
+    if (isBookmarked) {
+      deleteMetadata(existingBookmark.id);
+    } else {
+      saveMetadata(pageNumber, "bookmark", "", `페이지 ${pageNumber} 책갈피`);
+    }
   };
 
   if (!selectedFileId) {
@@ -132,10 +139,10 @@ export default function PdfViewer() {
             </button>
           </div>
           <button 
-            onClick={handleAddBookmark}
-            className="p-1.5 rounded text-primary bg-primary/10 hover:bg-primary/20 transition-colors"
+            onClick={handleToggleBookmark}
+            className={`p-1.5 rounded transition-colors ${isBookmarked ? 'text-primary bg-primary/10 hover:bg-primary/20' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-variant'}`}
           >
-            <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>bookmark</span>
+            <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: isBookmarked ? "'FILL' 1" : "'FILL' 0" }}>bookmark</span>
           </button>
         </div>
       </div>
@@ -161,8 +168,8 @@ export default function PdfViewer() {
             
             <button 
               onClick={() => {
+                setActionIntent("translate");
                 setTooltipPos(null);
-                // AI 패널에서 사용자가 확인하도록 유도 (이펙트용)
               }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-md hover:bg-surface-variant text-primary font-ui-label-bold text-ui-label-sm transition-colors whitespace-nowrap"
             >
@@ -172,8 +179,7 @@ export default function PdfViewer() {
             <div className="w-px h-4 bg-outline-variant mx-1"></div>
             <button 
               onClick={() => {
-                const { selectedText } = useStore.getState();
-                saveMetadata(pageNumber, "memo", selectedText, "");
+                setActionIntent("memo");
                 setTooltipPos(null);
               }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-md hover:bg-surface-variant text-on-surface-variant hover:text-on-surface font-ui-label-bold text-ui-label-sm transition-colors whitespace-nowrap"
