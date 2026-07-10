@@ -17,7 +17,7 @@ export function usePdfFile(fileId: string | null) {
       
       try {
         // 1. 캐시 확인
-        const cached = await db.pdfCache.get(fileId);
+        const cached = await db.pdfCache.get(fileId!);
         if (cached && cached.data) {
           console.log("로컬 캐시에서 PDF를 불러옵니다 (0.1초 렌더링).");
           if (isMounted) {
@@ -38,7 +38,7 @@ export function usePdfFile(fileId: string | null) {
 
         // 3. Dexie.js에 영구 캐싱
         await db.pdfCache.put({
-          fileId,
+          fileId: fileId!,
           data: arrayBuffer,
           updatedAt: new Date().toISOString(),
         });

@@ -57,8 +57,8 @@ describe('useMetadataSync', () => {
     (db.pdfMetadata.toArray as jest.Mock).mockResolvedValueOnce(mockLocalData);
     
     // Server fetch chain mock
-    const eqMock = supabase.from('pdf_metadata').select().eq;
-    (eqMock as jest.Mock).mockResolvedValueOnce({ data: [], error: null });
+    const eqMock = supabase.from('pdf_metadata').select().eq as unknown as jest.Mock;
+    eqMock.mockResolvedValueOnce({ data: [], error: null });
 
     const { result } = renderHook(() => useMetadataSync('file-123'));
 
