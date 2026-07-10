@@ -46,10 +46,11 @@ export function usePdfFile(fileId: string | null) {
         if (isMounted) {
           setFileData(arrayBuffer);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(err);
         if (isMounted) {
-          setError(err.message || "PDF를 불러오는 중 오류가 발생했습니다.");
+          const errorMessage = err instanceof Error ? err.message : "PDF를 불러오는 중 오류가 발생했습니다.";
+          setError(errorMessage);
         }
       } finally {
         if (isMounted) {

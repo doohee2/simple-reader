@@ -144,7 +144,7 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
               <div className="bg-surface-container-low border-l-2 border-outline-variant p-4 rounded-r-lg min-h-[60px] flex items-center">
                 {selectedText ? (
                   <p className="font-reading-body text-reading-body text-on-surface italic text-sm">
-                    "{selectedText}"
+                    &quot;{selectedText}&quot;
                   </p>
                 ) : (
                   <p className="text-ui-body text-on-surface-variant italic text-sm">
@@ -240,7 +240,7 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
                   {meta.selectedText && (
                     <div className="border-l-2 border-outline-variant pl-3">
                       <p className="text-sm text-on-surface-variant italic line-clamp-2">
-                        "{meta.selectedText}"
+                        &quot;{meta.selectedText}&quot;
                       </p>
                     </div>
                   )}

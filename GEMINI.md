@@ -14,7 +14,7 @@
 - **Styling**: Tailwind CSS (CSS Variables 기반 자체 디자인 시스템)
 - **State Management**: Zustand (전역 상태 관리)
 - **UI Components**: `lucide-react` (아이콘), `react-resizable-panels` (화면 분할 패널)
-- **PDF 렌더러**: `react-pdf` (서버사이드 렌더링 충돌 방지를 위해 `next/dynamic`로 동적 로딩 적용)
+- **PDF 렌더러**: `react-pdf` (서버사이드 렌더링 충돌 방지를 위해 `next/dynamic`로 동적 로딩 적용. *Next.js 웹팩 컴파일러와의 충돌 방지를 위해 v9.1.0 및 pdfjs-dist v3.11.174 안정화 버전 사용*)
 - **PWA**: `@serwist/next` (서비스 워커, 오프라인 캐싱, manifest 생성)
 
 ### **백엔드 (Backend & API)**
@@ -43,9 +43,12 @@ simple-reader/
 │   ├── Providers.tsx      # NextAuth의 SessionProvider를 App Router 환경에 래핑
 │   ├── Header.tsx         # 상단 헤더. 파일명 표시, 구글 로그인/로그아웃 버튼, 파일 열기 액션 연결
 │   ├── DrivePickerModal.tsx # 자체 구축한 구글 드라이브 탐색 모달창 (Iframe 미사용)
-│   ├── Workspace.tsx      # 메인 작업 영역. react-resizable-panels를 사용해 좌(PDF) 우(AI) 분할
-│   ├── PdfViewer.tsx      # react-pdf 뷰어. (ssr: false 동적 로딩). 드래그 텍스트 추출 및 책갈피 연동
-│   └── AiAssistantPanel.tsx # 우측 AI 패널. 번역/요약 스트리밍 출력, 메모 저장/삭제, Zustand 상태 바인딩
+│   ├── StorageManagerModal.tsx # 로컬 캐시(Dexie.js) 관리 및 전체 용량 최적화 모달
+│   ├── Workspace.tsx      # 메인 작업 영역. 데스크탑은 좌우 분할, 모바일은 상하 분할(BottomSheet) 레이아웃 적용
+│   ├── PdfViewer.tsx      # react-pdf 뷰어. 드래그 텍스트에 대한 플로팅 툴팁 버튼(번역/요약/메모) 제공 및 책갈피 연동
+│   ├── AiAssistantPanel.tsx # AI 패널. 번역/요약 스트리밍 출력, 메모 관리
+│   ├── MobileBottomSheet.tsx # 모바일 UI 전용 하단 드래그블 시트 (AI 패널 렌더링용)
+│   └── BottomNavBar.tsx   # 모바일 환경 전용 하단 네비게이션 도구 모음
 ├── hooks/
 │   ├── usePdfFile.ts      # Dexie.js 로컬 캐시를 1순위로 확인하고, 없으면 Google API로 다운로드하는 최적화 훅
 │   └── useMetadataSync.ts # Dexie.js(로컬)와 Supabase(클라우드) 간의 메모/책갈피 하이브리드 동기화 로직 훅

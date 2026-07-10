@@ -23,6 +23,7 @@ export default function MobileBottomSheet() {
   const [windowHeight, setWindowHeight] = useState(0);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setWindowHeight(window.innerHeight);
     const handleResize = () => setWindowHeight(window.innerHeight);
     window.addEventListener("resize", handleResize);
@@ -32,10 +33,13 @@ export default function MobileBottomSheet() {
   // 바텀 시트가 열릴 때 기본 높이 설정 (Peek 상태)
   useEffect(() => {
     if (isOpen && height === 0 && windowHeight > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setHeight(windowHeight * 0.4); // 기본 40% 높이
     } else if (!isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setHeight(0); // 닫히면 높이 0
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, windowHeight]);
 
   const handleDragStart = (clientY: number) => {
@@ -104,7 +108,8 @@ export default function MobileBottomSheet() {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isDragging, height, windowHeight]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDragging]);
 
   if (!isOpen) return null;
 

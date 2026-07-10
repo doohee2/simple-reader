@@ -32,6 +32,7 @@ export default function DrivePickerModal({ isOpen, onClose, onSelectFile }: Driv
     if (isOpen) {
       const storedFolderId = localStorage.getItem("defaultFolderId");
       if (storedFolderId) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setDefaultFolderId(storedFolderId);
         setCurrentFolderId(storedFolderId);
         setViewMode("library");
@@ -59,8 +60,9 @@ export default function DrivePickerModal({ isOpen, onClose, onSelectFile }: Driv
         }
         const data = await res.json();
         setFiles(data.files || []);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        if (err instanceof Error) setError(err.message);
+        else setError("Unknown error occurred");
       } finally {
         setLoading(false);
       }

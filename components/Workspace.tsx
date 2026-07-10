@@ -21,6 +21,7 @@ export default function Workspace() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);

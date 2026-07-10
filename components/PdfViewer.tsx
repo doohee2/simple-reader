@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -91,7 +91,7 @@ export default function PdfViewer() {
   if (!selectedFileId) {
     return (
       <section className="flex-1 flex items-center justify-center bg-surface-container-lowest h-full text-on-surface-variant">
-        상단 '드라이브 파일 열기'를 통해 PDF를 선택해 주세요.
+        상단 &apos;드라이브 파일 열기&apos;를 통해 PDF를 선택해 주세요.
       </section>
     );
   }
