@@ -3,6 +3,8 @@ import Dexie, { type EntityTable } from 'dexie';
 // 1. PDF Cache Table Interface
 export interface PdfCache {
   fileId: string;
+  fileName?: string;
+  fileSize?: number;
   data: ArrayBuffer;
   updatedAt: string;
 }
@@ -37,6 +39,8 @@ export default db;
 
 export interface StorageStat {
   fileId: string;
+  fileName?: string;
+  fileSize?: number;
   isCached: boolean;
   memoCount: number;
   bookmarkCount: number;
@@ -51,6 +55,8 @@ export async function getStorageStats(): Promise<StorageStat[]> {
   for (const cache of caches) {
     statsMap.set(cache.fileId, {
       fileId: cache.fileId,
+      fileName: cache.fileName,
+      fileSize: cache.fileSize,
       isCached: true,
       memoCount: 0,
       bookmarkCount: 0,

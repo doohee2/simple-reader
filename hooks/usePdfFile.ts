@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import db from '@/lib/db';
+import { useStore } from '@/store/useStore';
 
 export function usePdfFile(fileId: string | null) {
   const [fileData, setFileData] = useState<ArrayBuffer | null>(null);
@@ -36,9 +37,12 @@ export function usePdfFile(fileId: string | null) {
 
         const arrayBuffer = await res.arrayBuffer();
 
+        const { selectedFileName } = useStore.getState();
         // 3. Dexie.js에 영구 캐싱
         await db.pdfCache.put({
           fileId: fileId!,
+          fileName: selectedFileName || '알 수 없는 파일',
+          fileSize: arrayBuffer.byteLength,
           data: arrayBuffer,
           updatedAt: new Date().toISOString(),
         });

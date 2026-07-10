@@ -3,6 +3,7 @@
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import AiAssistantPanel from "./AiAssistantPanel";
 import MobileBottomSheet from "./MobileBottomSheet";
 import BottomNavBar from "./BottomNavBar";
@@ -17,6 +18,7 @@ const PdfViewer = dynamic(() => import("./PdfViewer"), {
 });
 
 export default function Workspace() {
+  const { status } = useSession();
   const [isMobile, setIsMobile] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -34,6 +36,30 @@ export default function Workspace() {
   // Hydration mismatch 방지
   if (!mounted) {
     return <main className="flex-1 flex overflow-hidden w-full bg-surface" />;
+  }
+
+  // 로그인 상태 확인
+  if (status === "loading") {
+    return (
+      <main className="flex-1 flex items-center justify-center bg-surface-container-lowest w-full h-full">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </main>
+    );
+  }
+
+  if (status === "unauthenticated") {
+    return (
+      <main className="flex-1 flex items-center justify-center bg-surface-container-lowest h-full w-full">
+        <div className="flex flex-col items-center gap-4 text-center max-w-md px-4">
+          <span className="material-symbols-outlined text-6xl text-primary/50">account_circle</span>
+          <h2 className="text-headline-md text-on-surface">로그인이 필요합니다</h2>
+          <p className="text-ui-body text-on-surface-variant">
+            상단의 <strong>Google 로그인</strong> 버튼을 눌러 이북 리더기를 시작해보세요. 
+            구글 드라이브와 자동으로 연동됩니다.
+          </p>
+        </div>
+      </main>
+    );
   }
 
   if (isMobile) {

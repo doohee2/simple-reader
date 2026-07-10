@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, HardDrive, Trash2, Database, FileText, CheckCircle2, Clock } from "lucide-react";
+import { X, Library, Trash2, Database, FileText, CheckCircle2, Clock } from "lucide-react";
 import { getStorageStats, deletePdfCache, clearAllPdfCaches, StorageStat } from "@/lib/db";
+import { useStore } from "@/store/useStore";
 
 interface StorageManagerModalProps {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface StorageManagerModalProps {
 }
 
 export default function StorageManagerModal({ isOpen, onClose }: StorageManagerModalProps) {
+  const { setSelectedFile } = useStore();
   const [stats, setStats] = useState<StorageStat[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -33,7 +35,8 @@ export default function StorageManagerModal({ isOpen, onClose }: StorageManagerM
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  const handleDeleteCache = async (fileId: string) => {
+  const handleDeleteCache = async (e: React.MouseEvent, fileId: string) => {
+    e.stopPropagation();
     if (confirm("이 파일의 캐시(PDF 데이터)를 기기에서 삭제하시겠습니까?\n작성한 메모와 책갈피는 유지됩니다.")) {
       await deletePdfCache(fileId);
       await loadStats();
@@ -47,6 +50,11 @@ export default function StorageManagerModal({ isOpen, onClose }: StorageManagerM
     }
   };
 
+  const handleSelectFile = (stat: StorageStat) => {
+    setSelectedFile(stat.fileId, stat.fileName || '알 수 없는 파일');
+    onClose();
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -56,8 +64,8 @@ export default function StorageManagerModal({ isOpen, onClose }: StorageManagerM
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-outline-variant">
           <h2 className="text-headline-sm text-on-surface flex items-center gap-2">
-            <Database className="text-primary" size={24} />
-            로컬 저장소 관리
+            <Library className="text-primary" size={24} />
+            내 서재
           </h2>
           <button onClick={onClose} className="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-variant rounded-full transition-colors">
             <X size={24} />
@@ -67,7 +75,7 @@ export default function StorageManagerModal({ isOpen, onClose }: StorageManagerM
         {/* Toolbar */}
         <div className="bg-surface-container-lowest px-6 py-4 border-b border-outline-variant flex justify-between items-center shrink-0">
           <p className="text-ui-label-sm text-on-surface-variant">
-            기기에 임시 저장된 PDF 캐시 용량을 관리합니다.
+            로컬에 저장된 이북을 확인하고 다시 엽니다.
           </p>
           <button
             onClick={handleClearAll}
@@ -92,7 +100,11 @@ export default function StorageManagerModal({ isOpen, onClose }: StorageManagerM
           ) : (
             <ul className="space-y-4">
               {stats.map((stat) => (
-                <li key={stat.fileId} className="bg-surface rounded-xl border border-outline-variant p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm hover:border-primary/30 transition-colors">
+                <li 
+                  key={stat.fileId} 
+                  onClick={() => handleSelectFile(stat)}
+                  className="bg-surface rounded-xl border border-outline-variant p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm hover:border-primary/50 hover:bg-surface-variant/30 transition-all cursor-pointer group"
+                >
                   
                   {/* Info Section */}
                   <div className="flex items-start gap-4 flex-1 min-w-0">
@@ -101,10 +113,15 @@ export default function StorageManagerModal({ isOpen, onClose }: StorageManagerM
                     </div>
                     
                     <div className="flex flex-col gap-1.5 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-ui-label-bold text-on-surface truncate" title={stat.fileId}>
-                          {stat.fileId.substring(0, 16)}...
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-ui-label-bold text-on-surface group-hover:text-primary transition-colors" title={stat.fileName || stat.fileId}>
+                          {stat.fileName || '알 수 없는 파일'}
                         </p>
+                        {stat.fileSize && (
+                          <span className="text-ui-label-sm text-on-surface-variant">
+                            ({(stat.fileSize / 1024 / 1024).toFixed(1)} MB)
+                          </span>
+                        )}
                         
                         {/* Status Badge */}
                         {stat.isCached ? (
@@ -130,10 +147,10 @@ export default function StorageManagerModal({ isOpen, onClose }: StorageManagerM
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center justify-end">
+                  <div className="flex items-center justify-end z-10">
                     {stat.isCached ? (
                       <button
-                        onClick={() => handleDeleteCache(stat.fileId)}
+                        onClick={(e) => handleDeleteCache(e, stat.fileId)}
                         className="flex items-center gap-1.5 text-ui-label-sm text-error hover:bg-error/10 border border-error/30 px-3 py-1.5 rounded transition-colors whitespace-nowrap"
                       >
                         <Trash2 size={14} />

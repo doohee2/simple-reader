@@ -1,6 +1,6 @@
 "use client";
 
-import { UserCircle, LogOut, HardDrive } from "lucide-react";
+import { UserCircle, LogOut, Library } from "lucide-react";
 import { signIn, signOut, useSession } from "next-auth/react";
 import { useState } from "react";
 import DrivePickerModal from "./DrivePickerModal";
@@ -58,13 +58,13 @@ export default function Header() {
           {/* 인증 상태에 따른 버튼들 */}
           {status === "authenticated" ? (
             <>
-              {/* 저장소 관리 버튼 */}
+              {/* 내 서재 버튼 */}
               <button
                 onClick={() => setIsStorageManagerOpen(true)}
                 className="p-1.5 md:p-2 text-on-surface-variant hover:text-primary transition-colors duration-200 rounded-full hover:bg-surface-variant flex-shrink-0"
-                title="로컬 저장소 관리"
+                title="내 서재"
               >
-                <HardDrive size={20} className="md:w-6 md:h-6" />
+                <Library size={20} className="md:w-6 md:h-6" />
               </button>
 
               {/* 파일 닫기 / 열기 */}

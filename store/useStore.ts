@@ -48,7 +48,11 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: 'simple-reader-storage',
-      partialize: (state) => ({ theme: state.theme }),
+      partialize: (state) => ({ 
+        theme: state.theme,
+        selectedFileId: state.selectedFileId,
+        selectedFileName: state.selectedFileName
+      }),
     }
   )
 );
