@@ -117,7 +117,30 @@ export function useMetadataSync(fileId: string | null) {
     }
   };
   
-  // 4. 메타데이터 삭제
+  // 4. 메타데이터 업데이트 (수정)
+  const updateMetadata = async (id: string, newContent: string) => {
+    if (!userId) return;
+    
+    // 로컬 즉시 업데이트
+    const item = await db.pdfMetadata.get(id);
+    if (item) {
+      item.content = newContent;
+      item.updatedAt = new Date().toISOString();
+      await db.pdfMetadata.put(item);
+      await loadLocalMetadata();
+    }
+
+    // 백그라운드 서버 동기화
+    try {
+      await supabase.from("pdf_metadata")
+        .update({ content: newContent, updated_at: new Date().toISOString() })
+        .eq("id", id).eq("user_id", userId);
+    } catch (err) {
+      console.error("Supabase 업데이트 동기화 실패:", err);
+    }
+  };
+
+  // 5. 메타데이터 삭제
   const deleteMetadata = async (id: string) => {
     if (!userId) return;
     
@@ -133,5 +156,5 @@ export function useMetadataSync(fileId: string | null) {
     }
   };
 
-  return { metadataList, saveMetadata, deleteMetadata };
+  return { metadataList, saveMetadata, updateMetadata, deleteMetadata };
 }

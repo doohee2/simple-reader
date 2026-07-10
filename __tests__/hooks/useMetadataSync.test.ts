@@ -22,20 +22,21 @@ jest.mock('@/lib/db', () => {
 });
 
 jest.mock('@/lib/supabase', () => {
-  const mEq = jest.fn().mockReturnThis();
   const mSelect = jest.fn().mockReturnThis();
   const mUpsert = jest.fn().mockResolvedValue({ error: null });
   const mDelete = jest.fn().mockReturnThis();
+  
+  const mChain = {
+    select: mSelect,
+    upsert: mUpsert,
+    delete: mDelete,
+  };
+  mChain.eq = jest.fn(() => mChain);
 
   return {
     __esModule: true,
     supabase: {
-      from: jest.fn(() => ({
-        select: mSelect,
-        eq: mEq,
-        upsert: mUpsert,
-        delete: mDelete,
-      })),
+      from: jest.fn(() => mChain),
     },
   };
 });

@@ -1,19 +1,51 @@
 "use client";
 
-import { Sparkles, MoreHorizontal, Save, Languages, Loader2, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useStore } from "@/store/useStore";
 import { useMetadataSync } from "@/hooks/useMetadataSync";
 
-export default function AiAssistantPanel() {
+interface AiAssistantPanelProps {
+  forceTab?: "ai" | "memo";
+}
+
+export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {}) {
   const [activeTab, setActiveTab] = useState<"ai" | "memo">("ai");
+
+  useEffect(() => {
+    if (forceTab) {
+      setActiveTab(forceTab);
+    }
+  }, [forceTab]);
+
   const { selectedFileId, selectedText, currentPage } = useStore();
   
   const [translationResult, setTranslationResult] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { metadataList, saveMetadata, deleteMetadata } = useMetadataSync(selectedFileId);
+  const { metadataList, saveMetadata, updateMetadata, deleteMetadata } = useMetadataSync(selectedFileId);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
+
+  const handleStartEdit = (id: string, content: string) => {
+    setEditingId(id);
+    setEditContent(content);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditContent("");
+  };
+
+  const handleSaveEdit = async (id: string) => {
+    if (editContent.trim()) {
+      await updateMetadata(id, editContent);
+    }
+    setEditingId(null);
+    setEditContent("");
+  };
 
   const handleTranslate = async (mode: "translate" | "summary" = "translate") => {
     if (!selectedText) return;
@@ -129,7 +161,7 @@ export default function AiAssistantPanel() {
                 disabled={!selectedText || isTranslating}
                 className="flex items-center gap-2 bg-secondary text-on-secondary px-4 py-2 rounded text-ui-label-bold hover:bg-[#00a572] transition-colors shadow-md disabled:opacity-50"
               >
-                {isTranslating ? <Loader2 size={16} className="animate-spin" /> : <Languages size={16} />}
+                {isTranslating ? <Loader2 size={16} className="animate-spin" /> : <span className="material-symbols-outlined text-[16px]">translate</span>}
                 한국어로 번역
               </button>
               <button 
@@ -145,7 +177,7 @@ export default function AiAssistantPanel() {
             {(translationResult || isTranslating || error) && (
               <div className="bg-primary/5 border border-primary/20 rounded-xl p-5 flex flex-col gap-4 relative mt-2 shadow-[inset_0_0_20px_rgba(208,188,255,0.05)]">
                 <div className="flex items-center gap-2">
-                  <Sparkles size={16} className="text-primary" />
+                  <span className="material-symbols-outlined text-primary text-[16px]">auto_awesome</span>
                   <span className="text-ui-label-bold text-primary">제미나이 AI</span>
                 </div>
                 
@@ -163,7 +195,7 @@ export default function AiAssistantPanel() {
                   disabled={isTranslating || !translationResult || !!error}
                   className="flex items-center justify-center gap-2 w-full py-2 border border-outline-variant rounded hover:bg-surface-variant text-on-surface transition-colors text-ui-label-bold disabled:opacity-50"
                 >
-                  <Save size={16} />
+                  <span className="material-symbols-outlined text-[16px]">save</span>
                   메모로 저장
                 </button>
               </div>
@@ -187,12 +219,22 @@ export default function AiAssistantPanel() {
                       </span>
                       <span className="text-on-surface-variant text-xs">Page {meta.page}</span>
                     </div>
-                    <button 
-                      onClick={() => deleteMetadata(meta.id)}
-                      className="text-on-surface-variant hover:text-error opacity-0 group-hover:opacity-100 transition-opacity p-1"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {editingId !== meta.id && (
+                        <button 
+                          onClick={() => handleStartEdit(meta.id, meta.content)}
+                          className="text-on-surface-variant hover:text-primary p-1 flex items-center justify-center"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">edit</span>
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => deleteMetadata(meta.id)}
+                        className="text-on-surface-variant hover:text-error p-1 flex items-center justify-center"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">delete</span>
+                      </button>
+                    </div>
                   </div>
                   
                   {meta.selectedText && (
@@ -203,9 +245,28 @@ export default function AiAssistantPanel() {
                     </div>
                   )}
                   
-                  <p className="text-sm text-on-surface font-medium leading-relaxed">
-                    {meta.content}
-                  </p>
+                  {editingId === meta.id ? (
+                    <div className="flex flex-col gap-2 mt-1">
+                      <textarea
+                        value={editContent}
+                        onChange={(e) => setEditContent(e.target.value)}
+                        className="w-full bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface resize-none focus:outline-none focus:border-primary"
+                        rows={3}
+                      />
+                      <div className="flex justify-end gap-2">
+                        <button onClick={handleCancelEdit} className="p-1 flex items-center justify-center text-on-surface-variant hover:text-error bg-surface-variant rounded">
+                          <span className="material-symbols-outlined text-[18px]">close</span>
+                        </button>
+                        <button onClick={() => handleSaveEdit(meta.id)} className="p-1 flex items-center justify-center text-primary bg-primary/10 hover:bg-primary/20 rounded">
+                          <span className="material-symbols-outlined text-[18px]">check</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-on-surface font-medium leading-relaxed whitespace-pre-wrap">
+                      {meta.content}
+                    </p>
+                  )}
                   
                   <span className="text-[10px] text-on-surface-variant self-end mt-1">
                     {new Date(meta.updatedAt).toLocaleString()}

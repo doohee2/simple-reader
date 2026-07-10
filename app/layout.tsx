@@ -35,6 +35,26 @@ export default function RootLayout({
       lang="ko"
       className={`dark ${inter.variable} ${merriweather.variable} h-full antialiased`}
     >
+      <head>
+        <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+        <style>{`
+          .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+          }
+        `}</style>
+      </head>
       <body className="h-full flex flex-col bg-background text-on-background overflow-hidden font-ui-body">
         <Providers>{children}</Providers>
       </body>
