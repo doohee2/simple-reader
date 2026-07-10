@@ -31,11 +31,33 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
+      <html
       lang="ko"
-      className={`dark ${inter.variable} ${merriweather.variable} h-full antialiased`}
+      className={`${inter.variable} ${merriweather.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                let theme = 'dark';
+                const stored = localStorage.getItem('simple-reader-storage');
+                if (stored) {
+                  const state = JSON.parse(stored).state;
+                  if (state && state.theme) {
+                    theme = state.theme;
+                  }
+                }
+                if (theme === 'dark') {
+                  document.documentElement.classList.add('dark');
+                } else {
+                  document.documentElement.classList.remove('dark');
+                }
+              } catch (e) {}
+            `,
+          }}
+        />
         <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
         <style>{`
           .material-symbols-outlined {

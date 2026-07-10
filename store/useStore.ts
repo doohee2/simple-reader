@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 interface StoreState {
   selectedFileId: string | null;
@@ -24,7 +25,9 @@ interface StoreState {
   setIsDrivePickerOpen: (isOpen: boolean) => void;
 }
 
-export const useStore = create<StoreState>((set) => ({
+export const useStore = create<StoreState>()(
+  persist(
+    (set) => ({
   selectedFileId: null,
   selectedFileName: null,
   setSelectedFile: (id, name) => set({ selectedFileId: id, selectedFileName: name }),
@@ -42,4 +45,10 @@ export const useStore = create<StoreState>((set) => ({
 
   isDrivePickerOpen: false,
   setIsDrivePickerOpen: (isOpen) => set({ isDrivePickerOpen: isOpen }),
-}));
+    }),
+    {
+      name: 'simple-reader-storage',
+      partialize: (state) => ({ theme: state.theme }),
+    }
+  )
+);

@@ -41,36 +41,34 @@
   --spacing-container-max-width: 1440px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Dark Mode Theme Tokens from DESIGN.md */
-    --color-background: #15121b;
-    --color-on-background: #e7e0ed;
-    --color-surface: #15121b;
-    --color-surface-dim: #15121b;
-    --color-surface-bright: #3b3742;
-    --color-surface-container-lowest: #0f0d15;
-    --color-surface-container-low: #1d1a23;
-    --color-surface-container: #211e27;
-    --color-surface-container-high: #2c2832;
-    --color-surface-container-highest: #37333d;
-    --color-on-surface: #e7e0ed;
-    --color-on-surface-variant: #cbc3d7;
-    --color-inverse-surface: #e7e0ed;
-    --color-inverse-on-surface: #322f39;
-    --color-outline: #958ea0;
-    --color-outline-variant: #494454;
-    
-    --color-primary: #d0bcff;
-    --color-on-primary: #3c0091;
-    --color-primary-container: #a078ff;
-    --color-on-primary-container: #340080;
-    
-    --color-secondary: #4edea3;
-    --color-on-secondary: #003824;
-    --color-secondary-container: #00a572;
-    --color-on-secondary-container: #00311f;
-  }
+.dark {
+  /* Dark Mode Theme Tokens from DESIGN.md */
+  --color-background: #15121b;
+  --color-on-background: #e7e0ed;
+  --color-surface: #15121b;
+  --color-surface-dim: #15121b;
+  --color-surface-bright: #3b3742;
+  --color-surface-container-lowest: #0f0d15;
+  --color-surface-container-low: #1d1a23;
+  --color-surface-container: #211e27;
+  --color-surface-container-high: #2c2832;
+  --color-surface-container-highest: #37333d;
+  --color-on-surface: #e7e0ed;
+  --color-on-surface-variant: #cbc3d7;
+  --color-inverse-surface: #e7e0ed;
+  --color-inverse-on-surface: #322f39;
+  --color-outline: #958ea0;
+  --color-outline-variant: #494454;
+  
+  --color-primary: #d0bcff;
+  --color-on-primary: #3c0091;
+  --color-primary-container: #a078ff;
+  --color-on-primary-container: #340080;
+  
+  --color-secondary: #4edea3;
+  --color-on-secondary: #003824;
+  --color-secondary-container: #00a572;
+  --color-on-secondary-container: #00311f;
 }
 
 body {
