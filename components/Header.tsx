@@ -36,9 +36,11 @@ export default function Header() {
         <div className="flex items-center gap-1 md:gap-4 flex-1 min-w-0">
           <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
             <span className="material-symbols-outlined text-primary text-xl md:text-2xl font-bold">menu_book</span>
-            <span className="text-ui-label-bold md:text-headline-sm font-bold text-primary tracking-tight hidden sm:block">
-              Simple Reader
-            </span>
+            <svg viewBox="0 0 340 60" className="h-[28px] sm:h-[34px] w-auto drop-shadow-sm hidden sm:block" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ fontFamily: 'var(--font-plus-jakarta-sans), sans-serif' }}>
+              <text x="0" y="45" fontWeight="800" fontSize="42" letterSpacing="-0.02em" className="fill-[#0066ff] dark:fill-[#d0ebff] transition-colors duration-300">Simple</text>
+              <circle cx="18" cy="10" r="4" className="fill-[#0066ff] dark:fill-[#d0ebff] transition-colors duration-300"/>
+              <text x="150" y="45" fontWeight="700" fontSize="42" letterSpacing="-0.02em" className="fill-[#1e293b] dark:fill-[#ffffff] transition-colors duration-300">Reader</text>
+            </svg>
           </div>
           <div className="h-4 md:h-6 w-px bg-outline-variant mx-1 md:mx-2 hidden sm:block"></div>
           <div className="flex flex-col min-w-0">

@@ -116,9 +116,17 @@ body {
 /* React-pdf customization to avoid blinking on load and support text selection layer */
 .react-pdf__Page__textContent {
   border: 1px solid transparent;
+  user-select: text !important;
+  cursor: text;
 }
 
 .react-pdf__Page__textContent::selection {
   background: rgba(139, 92, 246, 0.3); /* Violet primary with opacity */
   color: transparent;
+}
+
+/* TransformWrapper overrides to prevent it from blocking text selection */
+.react-transform-wrapper, 
+.react-transform-component {
+  user-select: auto !important;
 }

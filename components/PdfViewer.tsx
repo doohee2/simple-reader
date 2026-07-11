@@ -252,7 +252,7 @@ export default function PdfViewer() {
       initialScale={1}
       minScale={0.5}
       maxScale={4}
-      panning={{ disabled: true }} // Disable JS panning to allow native scroll
+      panning={{ activationKeys: ["Shift"] }} // Disable JS panning by default to allow text selection
       wheel={{ wheelDisabled: true }} // Disable wheel zoom to allow native vertical scroll
       pinch={{ step: 5 }}
       doubleClick={{ disabled: true }}
@@ -488,6 +488,7 @@ export default function PdfViewer() {
               onLoadSuccess={onDocumentLoadSuccess}
               loading={<Loader2 size={40} className="animate-spin text-primary m-10" />}
               error={<div className="p-4 text-error">문서를 렌더링할 수 없습니다.</div>}
+              className="w-full flex flex-col items-center"
             >
               {viewMode === "single" ? (
                 <div id={`page-${pageNumber}`} className="shadow-2xl bg-white transition-transform origin-top">
