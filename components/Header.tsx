@@ -18,6 +18,9 @@ export default function Header() {
     setIsDrivePickerOpen(false);
   };
 
+  const iconButtonClass = "w-9 h-9 md:w-10 md:h-10 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors duration-200 rounded-full hover:bg-surface-variant flex-shrink-0";
+  const iconClass = "material-symbols-outlined text-[22px] md:text-[24px]";
+
   return (
     <>
       <header className="flex justify-between items-center w-full px-2 md:px-8 h-14 md:h-16 bg-surface border-b border-outline-variant flex-shrink-0 z-10 gap-2">

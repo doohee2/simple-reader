@@ -6,12 +6,9 @@ const nextConfig: NextConfig = {
     esmExternals: 'loose',
   },
   transpilePackages: ['react-pdf', 'pdfjs-dist'],
-  webpack: (config, { dev }) => {
+  webpack: (config) => {
     config.resolve.alias.canvas = false;
     config.resolve.alias.encoding = false;
-    if (dev) {
-      config.devtool = 'source-map';
-    }
     return config;
   },
 };
