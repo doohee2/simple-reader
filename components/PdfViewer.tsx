@@ -302,7 +302,7 @@ export default function PdfViewer() {
       initialScale={1}
       minScale={0.5}
       maxScale={4}
-      panning={{ activationKeys: ["Shift"] }} // Disable JS panning by default to allow text selection
+      panning={{ disabled: true }} // Disable JS panning completely to allow native scroll (touch & mouse)
       wheel={{ wheelDisabled: true }} // Disable wheel zoom to allow native vertical scroll
       pinch={{ step: 5 }}
       doubleClick={{ disabled: true }}
@@ -544,8 +544,8 @@ export default function PdfViewer() {
 
         {!isLoading && downloadState === "success" && fileData && (
           <TransformComponent 
-            wrapperStyle={{ width: "100%", height: "max-content", overflow: "visible" }} 
-            contentStyle={{ minWidth: "100%", width: "max-content", display: "flex", flexDirection: "column", alignItems: "center" }}
+            wrapperStyle={{ width: "100%", height: "auto", overflow: "visible", touchAction: "auto" }} 
+            contentStyle={{ minWidth: "100%", width: "auto", display: "flex", flexDirection: "column", alignItems: "center" }}
           >
             <Document
               file={fileData}
