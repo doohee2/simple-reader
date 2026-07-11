@@ -34,7 +34,7 @@ export default function Workspace() {
   }, []);
 
   useEffect(() => {
-    // @ts-ignore
+    // @ts-expect-error: Session error is not explicitly typed in NextAuth v5 Beta
     if (session?.error === "RefreshAccessTokenError") {
       signIn("google", { prompt: "login" }); // Force sign in to obtain a new set of tokens
     }

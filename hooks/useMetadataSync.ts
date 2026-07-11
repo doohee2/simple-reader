@@ -2,34 +2,30 @@ import { useState, useEffect, useCallback } from "react";
 import db, { PdfMetadata } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
+import { useLiveQuery } from "dexie-react-hooks";
 
 export function useMetadataSync(fileId: string | null) {
   const { data: session } = useSession();
-  const [metadataList, setMetadataList] = useState<PdfMetadata[]>([]);
   const userId = session?.user?.id;
 
-  // 1. 로컬(Dexie)에서 메타데이터 불러오기
-  const loadLocalMetadata = useCallback(async () => {
-    if (!fileId) return;
-    try {
+  // 1. 로컬(Dexie)에서 메타데이터 실시간 불러오기
+  const metadataList = useLiveQuery(
+    async () => {
+      if (!fileId) return [];
       const localData = await db.pdfMetadata.where("fileId").equals(fileId).toArray();
       // 최신순 정렬
       localData.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-      setMetadataList(localData);
-    } catch (err) {
-      console.error("로컬 메타데이터 로드 실패:", err);
-    }
-  }, [fileId]);
+      return localData;
+    },
+    [fileId],
+    []
+  );
 
-  // 2. 초기 로드 시 로컬 데이터 즉시 세팅 후, 백엔드(Supabase)와 동기화
+  // 2. 초기 로드 시 백엔드(Supabase)와 동기화
   useEffect(() => {
     if (!fileId || !userId) return;
 
-    let isMounted = true;
-
     async function syncWithServer() {
-      await loadLocalMetadata();
-
       try {
         // 백엔드에서 최신 데이터 가져오기
         const { data: serverData, error } = await supabase
@@ -53,9 +49,6 @@ export function useMetadataSync(fileId: string | null) {
           }));
 
           await db.pdfMetadata.bulkPut(mergedData);
-          if (isMounted) {
-            await loadLocalMetadata();
-          }
         }
       } catch (err) {
         console.error("Supabase 동기화 실패 (오프라인 모드 유지):", err);
@@ -63,13 +56,9 @@ export function useMetadataSync(fileId: string | null) {
     }
 
     syncWithServer();
+  }, [fileId, userId]);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [fileId, userId, loadLocalMetadata]);
-
-  // 3. 새로운 메타데이터 저장 (로컬 저장 후 즉시 UI 업데이트, 이후 백그라운드 동기화)
+  // 3. 새로운 메타데이터 저장 (로컬 저장 후 백그라운드 동기화)
   const saveMetadata = async (
     page: number,
     type: "bookmark" | "memo",
@@ -93,7 +82,6 @@ export function useMetadataSync(fileId: string | null) {
 
     // 로컬 즉시 저장
     await db.pdfMetadata.put(newMeta);
-    await loadLocalMetadata();
 
     // 백그라운드 서버 동기화
     try {
@@ -126,7 +114,6 @@ export function useMetadataSync(fileId: string | null) {
       item.content = newContent;
       item.updatedAt = new Date().toISOString();
       await db.pdfMetadata.put(item);
-      await loadLocalMetadata();
     }
 
     // 백그라운드 서버 동기화
@@ -145,7 +132,6 @@ export function useMetadataSync(fileId: string | null) {
     
     // 로컬 즉시 삭제
     await db.pdfMetadata.delete(id);
-    await loadLocalMetadata();
 
     // 백그라운드 서버 동기화
     try {
@@ -155,5 +141,5 @@ export function useMetadataSync(fileId: string | null) {
     }
   };
 
-  return { metadataList, saveMetadata, updateMetadata, deleteMetadata };
+  return { metadataList: metadataList || [], saveMetadata, updateMetadata, deleteMetadata };
 }

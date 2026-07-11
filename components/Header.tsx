@@ -10,8 +10,16 @@ import { useStore } from "@/store/useStore";
 export default function Header() {
   const { data: session, status } = useSession();
   
-  const { selectedFileName, setSelectedFile, theme, toggleTheme, isDrivePickerOpen, setIsDrivePickerOpen } = useStore();
-  const [isStorageManagerOpen, setIsStorageManagerOpen] = useState(false);
+  const { 
+    selectedFileName, 
+    setSelectedFile, 
+    theme, 
+    toggleTheme, 
+    isDrivePickerOpen, 
+    setIsDrivePickerOpen,
+    isStorageManagerOpen,
+    setIsStorageManagerOpen
+  } = useStore();
 
   const handleSelectFile = (fileId: string, fileName: string) => {
     setSelectedFile(fileId, fileName);
@@ -67,7 +75,7 @@ export default function Header() {
                 className={iconButtonClass}
                 title="내 서재"
               >
-                <span className={iconClass}>local_library</span>
+                <Library className="w-[22px] h-[22px] md:w-[24px] md:h-[24px]" strokeWidth={2} />
               </button>
 
               {/* 파일 닫기 / 열기 */}

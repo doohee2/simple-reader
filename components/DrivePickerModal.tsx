@@ -36,9 +36,10 @@ export default function DrivePickerModal({ isOpen, onClose, onSelectFile }: Driv
       if (storedFolderId && storedPath) {
         try {
           const parsedPath = JSON.parse(storedPath);
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           setDefaultFolderId(storedFolderId);
           setPath(parsedPath);
-        } catch (e) {
+        } catch {
           setDefaultFolderId(null);
           setPath([{ id: "root", name: "내 드라이브" }]);
         }

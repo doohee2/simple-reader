@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useStore } from "@/store/useStore";
 import { useMetadataSync } from "@/hooks/useMetadataSync";
 
@@ -19,7 +19,7 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
     }
   }, [forceTab]);
 
-  const { selectedFileId, selectedText, currentPage, actionIntent, clearActionIntent } = useStore();
+  const { selectedFileId, selectedText, currentPage, actionIntent, clearActionIntent, setTargetPage } = useStore();
   
   const [translationResult, setTranslationResult] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
@@ -33,40 +33,7 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
   const [isAddingMemo, setIsAddingMemo] = useState(false);
   const [newMemoContent, setNewMemoContent] = useState("");
 
-  // actionIntent 감지 (툴팁에서 액션 발생 시)
-  useEffect(() => {
-    if (actionIntent === "translate") {
-      setActiveTab("ai");
-      clearActionIntent();
-      handleTranslate("translate");
-    } else if (actionIntent === "memo") {
-      setActiveTab("memo");
-      setIsAddingMemo(true);
-      setNewMemoContent("");
-      clearActionIntent();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actionIntent]);
-
-  const handleStartEdit = (id: string, content: string) => {
-    setEditingId(id);
-    setEditContent(content);
-  };
-
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    setEditContent("");
-  };
-
-  const handleSaveEdit = async (id: string) => {
-    if (editContent.trim()) {
-      await updateMetadata(id, editContent);
-    }
-    setEditingId(null);
-    setEditContent("");
-  };
-
-  const handleTranslate = async (mode: "translate" | "summary" = "translate") => {
+  const handleTranslate = useCallback(async (mode: "translate" | "summary" = "translate") => {
     if (!selectedText) return;
     
     setIsTranslating(true);
@@ -107,7 +74,46 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
     } finally {
       setIsTranslating(false);
     }
+  }, [selectedText]);
+
+  // actionIntent 감지 (툴팁에서 액션 발생 시)
+  useEffect(() => {
+    if (actionIntent === "translate") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setActiveTab("ai");
+      clearActionIntent();
+      handleTranslate("translate");
+    } else if (actionIntent === "memo") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setActiveTab("memo");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsAddingMemo(true);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setNewMemoContent("");
+      clearActionIntent();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actionIntent, handleTranslate, clearActionIntent]);
+
+  const handleStartEdit = (id: string, content: string) => {
+    setEditingId(id);
+    setEditContent(content);
   };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditContent("");
+  };
+
+  const handleSaveEdit = async (id: string) => {
+    if (editContent.trim()) {
+      await updateMetadata(id, editContent);
+    }
+    setEditingId(null);
+    setEditContent("");
+  };
+
+
 
   const handleSaveMemo = async () => {
     if (!translationResult) return;
@@ -282,7 +288,11 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
               </div>
             ) : (
               metadataList.map((meta) => (
-                <div key={meta.id} className="bg-surface-container border border-outline-variant rounded-xl p-4 flex flex-col gap-3 group relative hover:border-primary/50 transition-colors">
+                <div 
+                  key={meta.id} 
+                  className="bg-surface-container border border-outline-variant rounded-xl p-4 flex flex-col gap-3 group relative hover:border-primary/50 transition-colors cursor-pointer"
+                  onClick={() => setTargetPage(meta.page)}
+                >
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-2">
                       <span className="text-primary text-[10px] bg-primary/10 px-1.5 py-0.5 rounded font-bold">
@@ -293,14 +303,14 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       {editingId !== meta.id && (
                         <button 
-                          onClick={() => handleStartEdit(meta.id, meta.content)}
+                          onClick={(e) => { e.stopPropagation(); handleStartEdit(meta.id, meta.content); }}
                           className="text-on-surface-variant hover:text-primary p-1 flex items-center justify-center"
                         >
                           <span className="material-symbols-outlined text-[16px]">edit</span>
                         </button>
                       )}
                       <button 
-                        onClick={() => deleteMetadata(meta.id)}
+                        onClick={(e) => { e.stopPropagation(); deleteMetadata(meta.id); }}
                         className="text-on-surface-variant hover:text-error p-1 flex items-center justify-center"
                       >
                         <span className="material-symbols-outlined text-[16px]">delete</span>
@@ -321,14 +331,15 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
                       <textarea
                         value={editContent}
                         onChange={(e) => setEditContent(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
                         className="w-full bg-surface border border-outline-variant rounded p-2 text-sm text-on-surface resize-none focus:outline-none focus:border-primary"
                         rows={3}
                       />
                       <div className="flex justify-end gap-2">
-                        <button onClick={handleCancelEdit} className="p-1 flex items-center justify-center text-on-surface-variant hover:text-error bg-surface-variant rounded">
+                        <button onClick={(e) => { e.stopPropagation(); handleCancelEdit(); }} className="p-1 flex items-center justify-center text-on-surface-variant hover:text-error bg-surface-variant rounded">
                           <span className="material-symbols-outlined text-[18px]">close</span>
                         </button>
-                        <button onClick={() => handleSaveEdit(meta.id)} className="p-1 flex items-center justify-center text-primary bg-primary/10 hover:bg-primary/20 rounded">
+                        <button onClick={(e) => { e.stopPropagation(); handleSaveEdit(meta.id); }} className="p-1 flex items-center justify-center text-primary bg-primary/10 hover:bg-primary/20 rounded">
                           <span className="material-symbols-outlined text-[18px]">check</span>
                         </button>
                       </div>

@@ -36,6 +36,9 @@ describe('PdfViewer Integration', () => {
       selectedFileId: 'file-123',
       setSelectedText: mockSetSelectedText,
       clearSelectedText: mockClearSelectedText,
+      setActionIntent: jest.fn(),
+      viewMode: 'single',
+      toggleViewMode: jest.fn(),
     });
 
     (usePdfFile as jest.Mock).mockReturnValue({
@@ -45,7 +48,9 @@ describe('PdfViewer Integration', () => {
     });
 
     (useMetadataSync as jest.Mock).mockReturnValue({
+      metadataList: [],
       saveMetadata: jest.fn(),
+      deleteMetadata: jest.fn(),
     });
 
     const mockRemoveAllRanges = jest.fn();
@@ -62,9 +67,7 @@ describe('PdfViewer Integration', () => {
     const pageText = await findByText('1 / 5');
     expect(pageText).toBeInTheDocument();
 
-    const buttons = screen.getAllByRole('button');
-    const nextPageBtn = buttons[1]; // ChevronRight
-    
+    const nextPageBtn = screen.getByText('chevron_right').closest('button')!;
     fireEvent.click(nextPageBtn);
 
     expect(window.getSelection()?.removeAllRanges).toHaveBeenCalled();

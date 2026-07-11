@@ -12,6 +12,9 @@ interface StoreState {
   setSelectedText: (text: string, page: number) => void;
   clearSelectedText: () => void;
 
+  targetPage: number | null;
+  setTargetPage: (page: number | null) => void;
+
   // 테마 상태
   theme: "dark" | "light";
   toggleTheme: () => void;
@@ -49,6 +52,9 @@ export const useStore = create<StoreState>()(
   currentPage: 1,
   setSelectedText: (text, page) => set({ selectedText: text, currentPage: page }),
   clearSelectedText: () => set({ selectedText: "" }),
+
+  targetPage: null,
+  setTargetPage: (page) => set({ targetPage: page }),
 
   theme: "dark",
   toggleTheme: () => set((state) => ({ theme: state.theme === "dark" ? "light" : "dark" })),

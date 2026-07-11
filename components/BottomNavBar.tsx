@@ -1,5 +1,6 @@
 "use client";
 
+import { Library } from "lucide-react";
 import { useStore } from "@/store/useStore";
 
 export default function BottomNavBar() {
@@ -51,7 +52,7 @@ export default function BottomNavBar() {
         }}
         className="flex flex-col items-center justify-center flex-1 h-full gap-1 text-on-surface-variant hover:text-on-surface transition-colors"
       >
-        <span className="material-symbols-outlined text-[24px]">local_library</span>
+        <Library className="w-[24px] h-[24px]" strokeWidth={2} />
         <span className="text-[10px] font-ui-label-bold">내 서재</span>
       </button>
 

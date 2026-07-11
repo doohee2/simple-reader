@@ -10,7 +10,21 @@ import { useStore } from "@/store/useStore";
 import { usePdfFile } from "@/hooks/usePdfFile";
 import { useMetadataSync } from "@/hooks/useMetadataSync";
 
-const LazyPage = React.memo(({ pageNumber, scale, containerWidth, onIntersect }: { pageNumber: number, scale: number, containerWidth: number, onIntersect: (pageNumber: number) => void }) => {
+const LazyPage = React.memo(({ 
+  pageNumber, 
+  zoomMode,
+  customScale,
+  containerWidth, 
+  onIntersect,
+  onPageLoadSuccess
+}: { 
+  pageNumber: number, 
+  zoomMode: "fit" | "custom",
+  customScale: number,
+  containerWidth: number, 
+  onIntersect: (pageNumber: number) => void,
+  onPageLoadSuccess: (page: any) => void
+}) => {
   const ref = useRef<HTMLDivElement>(null);
   const [isRendered, setIsRendered] = useState(false);
 
@@ -41,14 +55,18 @@ const LazyPage = React.memo(({ pageNumber, scale, containerWidth, onIntersect }:
     };
   }, [pageNumber, onIntersect]);
 
+  const effectiveWidth = zoomMode === "fit" ? (containerWidth ? containerWidth - 32 : undefined) : undefined;
+  const effectiveScale = zoomMode === "fit" ? undefined : customScale;
+
   return (
-    <div ref={ref} className="mb-4 flex justify-center min-h-[600px] w-full relative">
+    <div id={`page-${pageNumber}`} ref={ref} className="mb-4 flex justify-center min-h-[600px] w-full relative">
       {isRendered ? (
         <div className="shadow-xl bg-white transition-transform origin-top">
           <Page
             pageNumber={pageNumber}
-            width={containerWidth ? containerWidth - 32 : undefined}
-            scale={scale}
+            width={effectiveWidth}
+            scale={effectiveScale}
+            onLoadSuccess={onPageLoadSuccess}
             renderTextLayer={true}
             renderAnnotationLayer={true}
             className="pdf-page"
@@ -60,7 +78,7 @@ const LazyPage = React.memo(({ pageNumber, scale, containerWidth, onIntersect }:
           />
         </div>
       ) : (
-        <div className="w-[800px] max-w-full h-[1130px] bg-surface-container shadow-xl animate-pulse" style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }} />
+        <div className="w-[800px] max-w-full h-[1130px] bg-surface-container shadow-xl animate-pulse" />
       )}
     </div>
   );
@@ -71,12 +89,14 @@ const workerExt = (pdfjs.version || "3.").startsWith("3.") ? "min.js" : "mjs";
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version || "3.11.174"}/build/pdf.worker.${workerExt}`;
 
 export default function PdfViewer() {
-  const { selectedFileId, setSelectedText, clearSelectedText, setActionIntent, viewMode, toggleViewMode } = useStore();
+  const { selectedFileId, setSelectedText, clearSelectedText, setActionIntent, viewMode, toggleViewMode, targetPage, setTargetPage } = useStore();
   const { fileData, isLoading, error } = usePdfFile(selectedFileId);
 
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);
-  const [nativeScale, setNativeScale] = useState<number>(1.0); // 1.0 = fit to width
+  const [zoomMode, setZoomMode] = useState<"fit" | "custom">("fit");
+  const [customScale, setCustomScale] = useState<number>(1.0);
+  const [pageBaseWidth, setPageBaseWidth] = useState<number>(0);
   const [containerWidth, setContainerWidth] = useState<number>(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -108,8 +128,17 @@ export default function PdfViewer() {
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
     setPageNumber(1);
+    setZoomMode("fit");
+    setPageBaseWidth(0); // Reset for new document
     handleCleanupSelection();
   };
+
+  const onPageLoadSuccess = useCallback((page: any) => {
+    if (pageBaseWidth === 0) {
+      const width = page.originalWidth || page.getViewport?.({ scale: 1 })?.width || 800;
+      setPageBaseWidth(width);
+    }
+  }, [pageBaseWidth]);
 
   // 텍스트 선택(드래그) 이벤트 핸들러
   const handleMouseUp = () => {
@@ -158,13 +187,28 @@ export default function PdfViewer() {
   const existingBookmark = metadataList.find(m => m.page === pageNumber && m.type === "bookmark");
   const isBookmarked = !!existingBookmark;
 
-  const handleToggleBookmark = () => {
+  const handleToggleBookmark = async () => {
+    if (!selectedFileId) return;
     if (isBookmarked) {
-      deleteMetadata(existingBookmark.id);
+      await deleteMetadata(existingBookmark.id);
     } else {
-      saveMetadata(pageNumber, "bookmark", "", `페이지 ${pageNumber} 책갈피`);
+      await saveMetadata(pageNumber, "bookmark", "", "책갈피");
     }
   };
+
+  // targetPage 감지 시 해당 페이지로 이동
+  useEffect(() => {
+    if (targetPage !== null) {
+      setPageNumber(targetPage);
+      if (viewMode === "continuous") {
+        const el = document.getElementById(`page-${targetPage}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }
+      setTargetPage(null);
+    }
+  }, [targetPage, viewMode, setTargetPage]);
 
   if (!selectedFileId) {
     return (
@@ -190,23 +234,29 @@ export default function PdfViewer() {
           const scrollY = el ? el.scrollTop : 0;
           const scrollX = el ? el.scrollLeft : 0;
           
-          setNativeScale(prev => {
-            const next = Math.min(Math.max(0.5, prev * cssScale), 4.0);
-            const ratio = next / prev;
-            
-            requestAnimationFrame(() => {
-              if (el) {
-                el.scrollTop = scrollY * ratio;
-                el.scrollLeft = scrollX * ratio;
-              }
-            });
-            return next;
+          const fitScale = (containerWidth && pageBaseWidth) ? (containerWidth - 32) / pageBaseWidth : 1;
+          const currentScale = zoomMode === "fit" ? fitScale : customScale;
+          const newScale = Math.min(Math.max(0.5, currentScale * cssScale), 4.0);
+          
+          setZoomMode("custom");
+          setCustomScale(newScale);
+          
+          const ratio = newScale / currentScale;
+          requestAnimationFrame(() => {
+            if (el) {
+              el.scrollTop = scrollY * ratio;
+              el.scrollLeft = scrollX * ratio;
+            }
           });
           ref.resetTransform(0);
         }
       }}
     >
-      {({ state }) => (
+      {({ state }) => {
+        const fitScale = (containerWidth && pageBaseWidth) ? (containerWidth - 32) / pageBaseWidth : 1;
+        const displayedScale = zoomMode === "fit" ? fitScale : customScale;
+        
+        return (
         <section className="flex-1 flex flex-col min-w-[300px] bg-surface-container-lowest relative h-full">
           {/* Toolbar */}
           <div className="h-12 bg-surface-container-low border-b border-outline-variant flex items-center justify-between px-2 md:px-4 flex-shrink-0">
@@ -250,17 +300,23 @@ export default function PdfViewer() {
             </div>
             <div className="flex items-center gap-2 md:gap-4">
               <div className="flex items-center gap-1 md:gap-2 bg-surface-container px-2 py-1 rounded">
-                <button onClick={() => setNativeScale(s => Math.max(s - 0.2, 0.5))} className="p-1 text-on-surface-variant hover:text-on-surface">
+                <button 
+                  onClick={() => { setZoomMode("custom"); setCustomScale(s => Math.max((zoomMode === "fit" ? fitScale : s) - 0.2, 0.5)); }} 
+                  className="p-1 text-on-surface-variant hover:text-on-surface"
+                >
                   <span className="material-symbols-outlined text-[18px]">remove</span>
                 </button>
                 <span className="text-ui-label-sm text-on-surface w-10 md:w-12 text-center">
-                  {Math.round(nativeScale * state.scale * 100)}%
+                  {Math.round(displayedScale * state.scale * 100)}%
                 </span>
-                <button onClick={() => setNativeScale(s => Math.min(s + 0.2, 4.0))} className="p-1 text-on-surface-variant hover:text-on-surface">
+                <button 
+                  onClick={() => { setZoomMode("custom"); setCustomScale(s => Math.min((zoomMode === "fit" ? fitScale : s) + 0.2, 4.0)); }} 
+                  className="p-1 text-on-surface-variant hover:text-on-surface"
+                >
                   <span className="material-symbols-outlined text-[18px]">add</span>
                 </button>
                 <div className="w-px h-3 bg-outline-variant mx-0.5"></div>
-                <button onClick={() => setNativeScale(1.0)} className="p-1 text-on-surface-variant hover:text-on-surface" title="가로 폭에 맞추기">
+                <button onClick={() => setZoomMode("fit")} className={`p-1 ${zoomMode === "fit" ? "text-primary bg-primary/10 rounded" : "text-on-surface-variant hover:text-on-surface"}`} title="가로 폭에 맞추기">
                   <span className="material-symbols-outlined text-[18px]">fit_screen</span>
                 </button>
               </div>
@@ -340,11 +396,12 @@ export default function PdfViewer() {
               error={<div className="p-4 text-error">문서를 렌더링할 수 없습니다.</div>}
             >
               {viewMode === "single" ? (
-                <div className="shadow-2xl bg-white transition-transform origin-top">
+                <div id={`page-${pageNumber}`} className="shadow-2xl bg-white transition-transform origin-top">
                   <Page
                     pageNumber={pageNumber}
-                    width={containerWidth ? containerWidth - 32 : undefined}
-                    scale={nativeScale}
+                    width={zoomMode === "fit" ? (containerWidth ? containerWidth - 32 : undefined) : undefined}
+                    scale={zoomMode === "fit" ? undefined : customScale}
+                    onLoadSuccess={onPageLoadSuccess}
                     renderTextLayer={true}
                     renderAnnotationLayer={true}
                     className="pdf-page"
@@ -355,9 +412,11 @@ export default function PdfViewer() {
                   <LazyPage 
                     key={i + 1} 
                     pageNumber={i + 1} 
-                    scale={nativeScale} 
+                    zoomMode={zoomMode}
+                    customScale={customScale}
                     containerWidth={containerWidth}
                     onIntersect={handleIntersect} 
+                    onPageLoadSuccess={onPageLoadSuccess}
                   />
                 ))
               )}
@@ -366,7 +425,7 @@ export default function PdfViewer() {
         )}
       </div>
     </section>
-  )}
+  )}}
 </TransformWrapper>
   );
 }
