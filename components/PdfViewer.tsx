@@ -113,6 +113,9 @@ export default function PdfViewer() {
   }, []);
 
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  
+  const [isEditingPage, setIsEditingPage] = useState(false);
+  const [pageInput, setPageInput] = useState("");
 
   // 페이지 전환이나 바깥 영역 클릭 시 선택된 텍스트 초기화
   const handleCleanupSelection = useCallback(() => {
@@ -179,8 +182,23 @@ export default function PdfViewer() {
   const nextPage = () => changePage(1);
 
   const handleIntersect = useCallback((page: number) => {
-    setPageNumber(page);
-  }, []);
+    // 편집 모드가 아닐 때만 스크롤 페이지 감지 업데이트
+    if (!isEditingPage) {
+      setPageNumber(page);
+    }
+  }, [isEditingPage]);
+
+  // 페이지 직접 입력 관련 핸들러
+  const handlePageInputBlur = () => {
+    const p = parseInt(pageInput);
+    if (!isNaN(p) && p >= 1 && p <= numPages) {
+      setPageNumber(p);
+      if (viewMode === "continuous") {
+        document.getElementById(`page-${p}`)?.scrollIntoView({ behavior: "smooth" });
+      }
+    }
+    setIsEditingPage(false);
+  };
 
   // 책갈피 저장/해제 (Toggle)
   const { metadataList, saveMetadata, deleteMetadata } = useMetadataSync(selectedFileId);
@@ -229,7 +247,31 @@ export default function PdfViewer() {
       doubleClick={{ disabled: true }}
       onZoomStop={(ref) => {
         const cssScale = ref.state.scale;
-        if (Math.abs(cssScale - 1) > 0.05) {
+        if (Math.abs(cssScale - 1) > 0.01) {
+          const el = containerRef.current;
+          const scrollY = el ? el.scrollTop : 0;
+          const scrollX = el ? el.scrollLeft : 0;
+          
+          const fitScale = (containerWidth && pageBaseWidth) ? (containerWidth - 32) / pageBaseWidth : 1;
+          const currentScale = zoomMode === "fit" ? fitScale : customScale;
+          const newScale = Math.min(Math.max(0.5, currentScale * cssScale), 4.0);
+          
+          setZoomMode("custom");
+          setCustomScale(newScale);
+          
+          const ratio = newScale / currentScale;
+          requestAnimationFrame(() => {
+            if (el) {
+              el.scrollTop = scrollY * ratio;
+              el.scrollLeft = scrollX * ratio;
+            }
+          });
+          ref.resetTransform(0);
+        }
+      }}
+      onPinchStop={(ref) => {
+        const cssScale = ref.state.scale;
+        if (Math.abs(cssScale - 1) > 0.01) {
           const el = containerRef.current;
           const scrollY = el ? el.scrollTop : 0;
           const scrollX = el ? el.scrollLeft : 0;
@@ -274,43 +316,65 @@ export default function PdfViewer() {
                 </span>
               </button>
               
-              <div className="w-px h-4 bg-outline-variant mx-1 md:mx-2"></div>
+              <div className="w-px h-4 bg-outline-variant mx-1"></div>
 
               {viewMode === "single" && (
                 <button
                   onClick={previousPage}
                   disabled={pageNumber <= 1}
-                  className="p-1.5 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-variant transition-colors disabled:opacity-30"
+                  className="p-1 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-variant transition-colors disabled:opacity-30"
                 >
                   <span className="material-symbols-outlined text-xl">chevron_left</span>
                 </button>
               )}
-              <span className="text-ui-label-bold text-on-surface-variant w-16 md:w-20 text-center">
-                {pageNumber} / {numPages || "-"}
-              </span>
+              {isEditingPage ? (
+                <div className="flex items-center mx-1">
+                  <input
+                    autoFocus
+                    type="number"
+                    className="w-12 h-6 text-center bg-surface border border-primary rounded text-ui-label-bold focus:outline-none"
+                    value={pageInput}
+                    onChange={e => setPageInput(e.target.value)}
+                    onBlur={handlePageInputBlur}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') e.currentTarget.blur();
+                    }}
+                  />
+                  <span className="text-ui-label-bold text-on-surface-variant ml-1 text-center whitespace-nowrap">
+                    / {numPages || "-"}
+                  </span>
+                </div>
+              ) : (
+                <span 
+                  onClick={() => { setIsEditingPage(true); setPageInput(pageNumber.toString()); }}
+                  className="text-ui-label-bold text-on-surface-variant min-w-[3.5rem] text-center cursor-pointer hover:text-primary transition-colors whitespace-nowrap px-1"
+                >
+                  {pageNumber} / {numPages || "-"}
+                </span>
+              )}
               {viewMode === "single" && (
                 <button
                   onClick={nextPage}
                   disabled={pageNumber >= numPages}
-                  className="p-1.5 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-variant transition-colors disabled:opacity-30"
+                  className="p-1 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-variant transition-colors disabled:opacity-30"
                 >
                   <span className="material-symbols-outlined text-xl">chevron_right</span>
                 </button>
               )}
             </div>
-            <div className="flex items-center gap-2 md:gap-4">
-              <div className="flex items-center gap-1 md:gap-2 bg-surface-container px-2 py-1 rounded">
+            <div className="flex items-center gap-1 md:gap-2">
+              <div className="flex items-center gap-0.5 md:gap-1 bg-surface-container px-1 py-1 rounded">
                 <button 
-                  onClick={() => { setZoomMode("custom"); setCustomScale(s => Math.max((zoomMode === "fit" ? fitScale : s) - 0.2, 0.5)); }} 
+                  onClick={() => { setZoomMode("custom"); setCustomScale(s => Math.max(Math.floor(((zoomMode === "fit" ? fitScale : s) * 100 - 1) / 5) * 5 / 100, 0.5)); }} 
                   className="p-1 text-on-surface-variant hover:text-on-surface"
                 >
                   <span className="material-symbols-outlined text-[18px]">remove</span>
                 </button>
-                <span className="text-ui-label-sm text-on-surface w-10 md:w-12 text-center">
+                <span className="text-ui-label-sm text-on-surface w-10 text-center whitespace-nowrap">
                   {Math.round(displayedScale * state.scale * 100)}%
                 </span>
                 <button 
-                  onClick={() => { setZoomMode("custom"); setCustomScale(s => Math.min((zoomMode === "fit" ? fitScale : s) + 0.2, 4.0)); }} 
+                  onClick={() => { setZoomMode("custom"); setCustomScale(s => Math.min(Math.ceil(((zoomMode === "fit" ? fitScale : s) * 100 + 1) / 5) * 5 / 100, 4.0)); }} 
                   className="p-1 text-on-surface-variant hover:text-on-surface"
                 >
                   <span className="material-symbols-outlined text-[18px]">add</span>
@@ -387,7 +451,7 @@ export default function PdfViewer() {
         {!isLoading && !error && fileData && (
           <TransformComponent 
             wrapperStyle={{ width: "100%", height: "max-content", overflow: "visible" }} 
-            contentStyle={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}
+            contentStyle={{ minWidth: "100%", width: "max-content", display: "flex", flexDirection: "column", alignItems: "center" }}
           >
             <Document
               file={fileData}
