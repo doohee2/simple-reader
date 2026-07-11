@@ -114,7 +114,7 @@ export default function PdfViewer() {
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [selectedFileId]);
 
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
   
