@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react";
 import { useStore } from "@/store/useStore";
 import { usePdfFile } from "@/hooks/usePdfFile";
 import { useMetadataSync } from "@/hooks/useMetadataSync";
+import db from "@/lib/db";
 
 const LazyPage = React.memo(({ 
   pageNumber, 
@@ -130,9 +131,41 @@ export default function PdfViewer() {
     setTooltipPos(null);
   }, [clearSelectedText]);
 
-import db from "@/lib/db";
+  // Document 로드 성공 핸들러
+  const onDocumentLoadSuccess = async ({ numPages }: { numPages: number }) => {
+    setNumPages(numPages);
+    setZoomMode("fit");
+    setPageBaseWidth(0); // Reset for new document
+    handleCleanupSelection();
 
-// ... (We just need to replace the onDocumentLoadSuccess function block, but since I can't put `import` in the middle, I'll replace the block and ensure db is imported at the top if needed. Wait, we need to import db at the top. Let's do a multi_replace instead to be safe.)
+    // 마지막 책갈피 위치로 이동
+    if (selectedFileId) {
+      try {
+        const localData = await db.pdfMetadata.where("fileId").equals(selectedFileId).toArray();
+        const bookmarks = localData.filter(m => m.type === "bookmark");
+        if (bookmarks.length > 0) {
+          bookmarks.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+          const latestBookmarkPage = bookmarks[0].page;
+          setPageNumber(latestBookmarkPage);
+          
+          // 연속 보기 모드일 경우 해당 DOM 요소로 스크롤 이동
+          if (viewMode === "continuous") {
+            setTimeout(() => {
+              const el = document.getElementById(`page-${latestBookmarkPage}`);
+              if (el) {
+                el.scrollIntoView({ behavior: "smooth", block: "start" });
+              }
+            }, 500); // 렌더링 대기 후 스크롤
+          }
+          return;
+        }
+      } catch (err) {
+        console.error("최근 책갈피 조회 실패:", err);
+      }
+    }
+    
+    setPageNumber(1);
+  };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const onPageLoadSuccess = useCallback((page: any) => {
