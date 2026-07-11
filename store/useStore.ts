@@ -24,6 +24,10 @@ interface StoreState {
   isDrivePickerOpen: boolean;
   setIsDrivePickerOpen: (isOpen: boolean) => void;
 
+  // PDF 뷰 모드
+  viewMode: "single" | "continuous";
+  toggleViewMode: () => void;
+
   // 플로팅 툴팁 액션 의도 전달용
   actionIntent: "translate" | "summary" | "memo" | null;
   setActionIntent: (intent: "translate" | "summary" | "memo" | null) => void;
@@ -51,6 +55,9 @@ export const useStore = create<StoreState>()(
   isDrivePickerOpen: false,
   setIsDrivePickerOpen: (isOpen) => set({ isDrivePickerOpen: isOpen }),
 
+  viewMode: "single",
+  toggleViewMode: () => set((state) => ({ viewMode: state.viewMode === "single" ? "continuous" : "single" })),
+
   actionIntent: null,
   setActionIntent: (intent) => set({ actionIntent: intent }),
   clearActionIntent: () => set({ actionIntent: null }),
@@ -60,7 +67,8 @@ export const useStore = create<StoreState>()(
       partialize: (state) => ({ 
         theme: state.theme,
         selectedFileId: state.selectedFileId,
-        selectedFileName: state.selectedFileName
+        selectedFileName: state.selectedFileName,
+        viewMode: state.viewMode
       }),
     }
   )

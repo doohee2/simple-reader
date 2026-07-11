@@ -4,21 +4,79 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { Loader2 } from "lucide-react";
 import { useStore } from "@/store/useStore";
 import { usePdfFile } from "@/hooks/usePdfFile";
 import { useMetadataSync } from "@/hooks/useMetadataSync";
 
+const LazyPage = React.memo(({ pageNumber, scale, onIntersect }: { pageNumber: number, scale: number, onIntersect: (pageNumber: number) => void }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [isRendered, setIsRendered] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const renderObserver = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setIsRendered(true);
+        renderObserver.disconnect();
+      }
+    }, { rootMargin: "1000px 0px" });
+    
+    renderObserver.observe(el);
+
+    const trackObserver = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        onIntersect(pageNumber);
+      }
+    }, { rootMargin: "-40% 0px -40% 0px" });
+    
+    trackObserver.observe(el);
+
+    return () => {
+      renderObserver.disconnect();
+      trackObserver.disconnect();
+    };
+  }, [pageNumber, onIntersect]);
+
+  return (
+    <div ref={ref} className="mb-4 flex justify-center min-h-[600px] w-full relative">
+      {isRendered ? (
+        <div className="shadow-xl bg-white transition-transform origin-top">
+          <Page
+            pageNumber={pageNumber}
+            scale={scale}
+            renderTextLayer={true}
+            renderAnnotationLayer={true}
+            className="pdf-page"
+            loading={
+              <div className="absolute inset-0 flex items-center justify-center bg-surface-container">
+                <Loader2 className="animate-spin text-primary" size={32} />
+              </div>
+            }
+          />
+        </div>
+      ) : (
+        <div className="w-[800px] max-w-full h-[1130px] bg-surface-container shadow-xl animate-pulse" style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }} />
+      )}
+    </div>
+  );
+});
+LazyPage.displayName = "LazyPage";
+
 const workerExt = (pdfjs.version || "3.").startsWith("3.") ? "min.js" : "mjs";
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version || "3.11.174"}/build/pdf.worker.${workerExt}`;
 
 export default function PdfViewer() {
-  const { selectedFileId, setSelectedText, clearSelectedText, setActionIntent } = useStore();
+  const { selectedFileId, setSelectedText, clearSelectedText, setActionIntent, viewMode, toggleViewMode } = useStore();
   const { fileData, isLoading, error } = usePdfFile(selectedFileId);
 
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);
-  const [scale, setScale] = useState<number>(1.2);
+  const nativeScale = 1.2; // Native react-pdf rendering resolution
+
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
@@ -78,9 +136,9 @@ export default function PdfViewer() {
   const previousPage = () => changePage(-1);
   const nextPage = () => changePage(1);
 
-  // 줌 인/아웃
-  const zoomIn = () => setScale((s) => Math.min(s + 0.2, 3.0));
-  const zoomOut = () => setScale((s) => Math.max(s - 0.2, 0.5));
+  const handleIntersect = useCallback((page: number) => {
+    setPageNumber(page);
+  }, []);
 
   // 책갈피 저장/해제 (Toggle)
   const { metadataList, saveMetadata, deleteMetadata } = useMetadataSync(selectedFileId);
@@ -104,48 +162,77 @@ export default function PdfViewer() {
   }
 
   return (
-    <section className="flex-1 flex flex-col min-w-[300px] bg-surface-container-lowest relative h-full">
-      {/* Toolbar */}
-      <div className="h-12 bg-surface-container-low border-b border-outline-variant flex items-center justify-between px-4 flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={previousPage}
-            disabled={pageNumber <= 1}
-            className="p-1.5 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-variant transition-colors disabled:opacity-30"
-          >
-            <span className="material-symbols-outlined text-xl">chevron_left</span>
-          </button>
-          <span className="text-ui-label-bold text-on-surface-variant w-20 text-center">
-            {pageNumber} / {numPages || "-"}
-          </span>
-          <button
-            onClick={nextPage}
-            disabled={pageNumber >= numPages}
-            className="p-1.5 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-variant transition-colors disabled:opacity-30"
-          >
-            <span className="material-symbols-outlined text-xl">chevron_right</span>
-          </button>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 bg-surface-container px-2 py-1 rounded">
-            <button onClick={zoomOut} className="p-1 text-on-surface-variant hover:text-on-surface">
-              <span className="material-symbols-outlined text-[18px]">remove</span>
-            </button>
-            <span className="text-ui-label-sm text-on-surface w-12 text-center">
-              {Math.round(scale * 100)}%
-            </span>
-            <button onClick={zoomIn} className="p-1 text-on-surface-variant hover:text-on-surface">
-              <span className="material-symbols-outlined text-[18px]">add</span>
-            </button>
+    <TransformWrapper
+      initialScale={1}
+      minScale={0.5}
+      maxScale={4}
+      panning={{ disabled: true }} // Disable JS panning to allow native scroll
+      wheel={{ wheelDisabled: true }} // Disable wheel zoom to allow native vertical scroll
+      pinch={{ step: 5 }}
+      doubleClick={{ disabled: true }}
+    >
+      {({ zoomIn, zoomOut, state }) => (
+        <section className="flex-1 flex flex-col min-w-[300px] bg-surface-container-lowest relative h-full">
+          {/* Toolbar */}
+          <div className="h-12 bg-surface-container-low border-b border-outline-variant flex items-center justify-between px-2 md:px-4 flex-shrink-0">
+            <div className="flex items-center gap-1 md:gap-2">
+              <button
+                onClick={toggleViewMode}
+                className="p-1.5 rounded text-primary hover:bg-primary/10 transition-colors flex items-center gap-1"
+                title={viewMode === "single" ? "연속해서 보기" : "한 페이지씩 보기"}
+              >
+                <span className="material-symbols-outlined text-[20px]">
+                  {viewMode === "single" ? "view_stream" : "article"}
+                </span>
+                <span className="hidden md:inline text-ui-label-sm font-bold">
+                  {viewMode === "single" ? "연속" : "단일"}
+                </span>
+              </button>
+              
+              <div className="w-px h-4 bg-outline-variant mx-1 md:mx-2"></div>
+
+              {viewMode === "single" && (
+                <button
+                  onClick={previousPage}
+                  disabled={pageNumber <= 1}
+                  className="p-1.5 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-variant transition-colors disabled:opacity-30"
+                >
+                  <span className="material-symbols-outlined text-xl">chevron_left</span>
+                </button>
+              )}
+              <span className="text-ui-label-bold text-on-surface-variant w-16 md:w-20 text-center">
+                {pageNumber} / {numPages || "-"}
+              </span>
+              {viewMode === "single" && (
+                <button
+                  onClick={nextPage}
+                  disabled={pageNumber >= numPages}
+                  className="p-1.5 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-variant transition-colors disabled:opacity-30"
+                >
+                  <span className="material-symbols-outlined text-xl">chevron_right</span>
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2 md:gap-4">
+              <div className="flex items-center gap-1 md:gap-2 bg-surface-container px-2 py-1 rounded">
+                <button onClick={() => zoomOut()} className="p-1 text-on-surface-variant hover:text-on-surface">
+                  <span className="material-symbols-outlined text-[18px]">remove</span>
+                </button>
+                <span className="text-ui-label-sm text-on-surface w-10 md:w-12 text-center">
+                  {Math.round(state.scale * 100)}%
+                </span>
+                <button onClick={() => zoomIn()} className="p-1 text-on-surface-variant hover:text-on-surface">
+                  <span className="material-symbols-outlined text-[18px]">add</span>
+                </button>
+              </div>
+              <button 
+                onClick={handleToggleBookmark}
+                className={`p-1.5 rounded transition-colors ${isBookmarked ? 'text-primary bg-primary/10 hover:bg-primary/20' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-variant'}`}
+              >
+                <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: isBookmarked ? "'FILL' 1" : "'FILL' 0" }}>bookmark</span>
+              </button>
+            </div>
           </div>
-          <button 
-            onClick={handleToggleBookmark}
-            className={`p-1.5 rounded transition-colors ${isBookmarked ? 'text-primary bg-primary/10 hover:bg-primary/20' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-variant'}`}
-          >
-            <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: isBookmarked ? "'FILL' 1" : "'FILL' 0" }}>bookmark</span>
-          </button>
-        </div>
-      </div>
 
       {/* PDF Canvas */}
       <div 
@@ -203,24 +290,42 @@ export default function PdfViewer() {
         )}
 
         {!isLoading && !error && fileData && (
-          <div className="shadow-2xl bg-white transition-transform origin-top">
+          <TransformComponent 
+            wrapperStyle={{ width: "100%", height: "max-content", overflow: "visible" }} 
+            contentStyle={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}
+          >
             <Document
               file={fileData}
               onLoadSuccess={onDocumentLoadSuccess}
               loading={<Loader2 size={40} className="animate-spin text-primary m-10" />}
               error={<div className="p-4 text-error">문서를 렌더링할 수 없습니다.</div>}
             >
-              <Page
-                pageNumber={pageNumber}
-                scale={scale}
-                renderTextLayer={true}
-                renderAnnotationLayer={true}
-                className="pdf-page"
-              />
+              {viewMode === "single" ? (
+                <div className="shadow-2xl bg-white transition-transform origin-top">
+                  <Page
+                    pageNumber={pageNumber}
+                    scale={nativeScale}
+                    renderTextLayer={true}
+                    renderAnnotationLayer={true}
+                    className="pdf-page"
+                  />
+                </div>
+              ) : (
+                Array.from({ length: numPages }, (_, i) => (
+                  <LazyPage 
+                    key={i + 1} 
+                    pageNumber={i + 1} 
+                    scale={nativeScale} 
+                    onIntersect={handleIntersect} 
+                  />
+                ))
+              )}
             </Document>
-          </div>
+          </TransformComponent>
         )}
       </div>
     </section>
+  )}
+</TransformWrapper>
   );
 }

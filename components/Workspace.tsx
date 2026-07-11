@@ -3,7 +3,7 @@
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
 import AiAssistantPanel from "./AiAssistantPanel";
 import MobileBottomSheet from "./MobileBottomSheet";
 import BottomNavBar from "./BottomNavBar";
@@ -18,7 +18,7 @@ const PdfViewer = dynamic(() => import("./PdfViewer"), {
 });
 
 export default function Workspace() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const [isMobile, setIsMobile] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -32,6 +32,13 @@ export default function Workspace() {
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
+
+  useEffect(() => {
+    // @ts-ignore
+    if (session?.error === "RefreshAccessTokenError") {
+      signIn("google", { prompt: "login" }); // Force sign in to obtain a new set of tokens
+    }
+  }, [session]);
 
   // Hydration mismatch 방지
   if (!mounted) {
