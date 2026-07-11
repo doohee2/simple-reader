@@ -21,6 +21,8 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
 
   const { selectedFileId, selectedText, currentPage, actionIntent, clearActionIntent, setTargetPage } = useStore();
   
+  const [selectedModel, setSelectedModel] = useState("gemini-3.1-flash-lite");
+  const [customPrompt, setCustomPrompt] = useState("설명 없이 번역한 결과만");
   const [translationResult, setTranslationResult] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +48,12 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ text: selectedText, mode }),
+        body: JSON.stringify({ 
+          text: selectedText, 
+          mode, 
+          customPrompt: customPrompt.trim(),
+          model: selectedModel
+        }),
       });
 
       if (!res.ok) {
@@ -74,7 +81,7 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
     } finally {
       setIsTranslating(false);
     }
-  }, [selectedText]);
+  }, [selectedText, customPrompt, selectedModel]);
 
   // actionIntent 감지 (툴팁에서 액션 발생 시)
   useEffect(() => {
@@ -179,8 +186,38 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
               </div>
             </div>
 
+            {/* Custom Prompt & Model Selection */}
+            <div className="flex flex-col gap-2 mt-2">
+              <div className="flex gap-2">
+                <select
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  className="bg-surface border border-outline-variant rounded-lg px-2 py-3 text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm w-[40%]"
+                  disabled={isTranslating}
+                >
+                  <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite</option>
+                  <option value="gemini-3.1-flash">gemini-3.1-flash</option>
+                  <option value="gemini-flash-latest">gemini-flash-latest</option>
+                  <option value="gemini-3.1-pro">gemini-3.1-pro</option>
+                </select>
+                <input
+                  type="text"
+                  placeholder="추가 요청사항 (예: 경어체로 번역, 설명 생략)"
+                  value={customPrompt}
+                  onChange={(e) => setCustomPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && selectedText && !isTranslating) {
+                      handleTranslate("translate");
+                    }
+                  }}
+                  className="w-[60%] bg-surface border border-outline-variant rounded-lg p-3 text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm"
+                  disabled={!selectedText || isTranslating}
+                />
+              </div>
+            </div>
+
             {/* Action Area */}
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center mt-2">
               <button 
                 onClick={() => handleTranslate("translate")}
                 disabled={!selectedText || isTranslating}

@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { text, mode } = await request.json();
+    const { text, mode, customPrompt, model } = await request.json();
 
     if (!text || text.trim() === "") {
       return NextResponse.json(
@@ -22,14 +22,18 @@ export async function POST(request: NextRequest) {
     }
 
     const ai = new GoogleGenAI({ apiKey });
-    const prompt =
+    let prompt =
       mode === "summary"
         ? `다음 텍스트의 핵심 내용을 한국어로 간결하게 요약해 주세요.\n\n[텍스트]\n${text}`
         : `다음 텍스트를 자연스럽고 매끄러운 한국어로 번역해 주세요.\n\n[텍스트]\n${text}`;
 
-    // gemini-2.0-flash 사용 (최신 안정화 버전)
+    if (customPrompt && customPrompt.trim() !== "") {
+      prompt += `\n\n[추가 요청사항(사용자 지시)]\n${customPrompt.trim()}\n(위 요청사항을 최우선으로 반영하여 결과물만 깔끔하게 출력해 주세요.)`;
+    }
+
+    // 클라이언트에서 선택한 모델 사용 (기본값 fallback)
     const stream = await ai.models.generateContentStream({
-      model: "gemini-2.0-flash",
+      model: model || "gemini-flash-latest",
       contents: prompt,
     });
 

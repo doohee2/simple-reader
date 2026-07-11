@@ -130,14 +130,9 @@ export default function PdfViewer() {
     setTooltipPos(null);
   }, [clearSelectedText]);
 
-  // Document 로드 성공 핸들러
-  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
-    setNumPages(numPages);
-    setPageNumber(1);
-    setZoomMode("fit");
-    setPageBaseWidth(0); // Reset for new document
-    handleCleanupSelection();
-  };
+import db from "@/lib/db";
+
+// ... (We just need to replace the onDocumentLoadSuccess function block, but since I can't put `import` in the middle, I'll replace the block and ensure db is imported at the top if needed. Wait, we need to import db at the top. Let's do a multi_replace instead to be safe.)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const onPageLoadSuccess = useCallback((page: any) => {
