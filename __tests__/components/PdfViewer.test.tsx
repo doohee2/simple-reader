@@ -1,5 +1,16 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import PdfViewer from '@/components/PdfViewer';
+
+class MockIntersectionObserver {
+  constructor(callback: any) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _cb = callback;
+  }
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+global.IntersectionObserver = MockIntersectionObserver as any;
 import { useStore } from '@/store/useStore';
 import { usePdfFile } from '@/hooks/usePdfFile';
 import { useMetadataSync } from '@/hooks/useMetadataSync';
@@ -28,17 +39,24 @@ jest.mock('react-pdf', () => ({
 describe('PdfViewer Integration', () => {
   const mockClearSelectedText = jest.fn();
   const mockSetSelectedText = jest.fn();
+  const mockSetActionIntent = jest.fn();
+  const mockToggleViewMode = jest.fn();
   
+  const mockSetTargetPage = jest.fn();
+
   beforeEach(() => {
     jest.clearAllMocks();
 
     (useStore as unknown as jest.Mock).mockReturnValue({
       selectedFileId: 'file-123',
+      selectedText: '',
       setSelectedText: mockSetSelectedText,
       clearSelectedText: mockClearSelectedText,
-      setActionIntent: jest.fn(),
+      setActionIntent: mockSetActionIntent,
       viewMode: 'single',
-      toggleViewMode: jest.fn(),
+      toggleViewMode: mockToggleViewMode,
+      targetPage: null,
+      setTargetPage: mockSetTargetPage,
     });
 
     (usePdfFile as jest.Mock).mockReturnValue({

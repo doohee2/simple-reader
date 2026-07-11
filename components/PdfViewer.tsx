@@ -23,6 +23,7 @@ const LazyPage = React.memo(({
   customScale: number,
   containerWidth: number, 
   onIntersect: (pageNumber: number) => void,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onPageLoadSuccess: (page: any) => void
 }) => {
   const ref = useRef<HTMLDivElement>(null);
@@ -100,6 +101,8 @@ export default function PdfViewer() {
   const [containerWidth, setContainerWidth] = useState<number>(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const transformRef = useRef<any>(null);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -136,6 +139,7 @@ export default function PdfViewer() {
     handleCleanupSelection();
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const onPageLoadSuccess = useCallback((page: any) => {
     if (pageBaseWidth === 0) {
       const width = page.originalWidth || page.getViewport?.({ scale: 1 })?.width || 800;
@@ -180,6 +184,11 @@ export default function PdfViewer() {
   };
   const previousPage = () => changePage(-1);
   const nextPage = () => changePage(1);
+  
+  const handleToggleViewMode = () => {
+    toggleViewMode();
+    transformRef.current?.resetTransform(0);
+  };
 
   const handleIntersect = useCallback((page: number) => {
     // 편집 모드가 아닐 때만 스크롤 페이지 감지 업데이트
@@ -217,6 +226,7 @@ export default function PdfViewer() {
   // targetPage 감지 시 해당 페이지로 이동
   useEffect(() => {
     if (targetPage !== null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPageNumber(targetPage);
       if (viewMode === "continuous") {
         const el = document.getElementById(`page-${targetPage}`);
@@ -238,6 +248,7 @@ export default function PdfViewer() {
 
   return (
     <TransformWrapper
+      ref={transformRef}
       initialScale={1}
       minScale={0.5}
       maxScale={4}
@@ -298,13 +309,32 @@ export default function PdfViewer() {
         const fitScale = (containerWidth && pageBaseWidth) ? (containerWidth - 32) / pageBaseWidth : 1;
         const displayedScale = zoomMode === "fit" ? fitScale : customScale;
         
+        const handleZoomIn = () => {
+          const perceived = displayedScale * state.scale;
+          setZoomMode("custom");
+          setCustomScale(Math.min(Math.ceil((perceived * 100 + 1) / 5) * 5 / 100, 4.0));
+          transformRef.current?.resetTransform(0);
+        };
+
+        const handleZoomOut = () => {
+          const perceived = displayedScale * state.scale;
+          setZoomMode("custom");
+          setCustomScale(Math.max(Math.floor((perceived * 100 - 1) / 5) * 5 / 100, 0.5));
+          transformRef.current?.resetTransform(0);
+        };
+
+        const handleFit = () => {
+          setZoomMode("fit");
+          transformRef.current?.resetTransform(0);
+        };
+        
         return (
         <section className="flex-1 flex flex-col min-w-[300px] bg-surface-container-lowest relative h-full">
           {/* Toolbar */}
           <div className="h-12 bg-surface-container-low border-b border-outline-variant flex items-center justify-between px-2 md:px-4 flex-shrink-0">
             <div className="flex items-center gap-1 md:gap-2">
               <button
-                onClick={toggleViewMode}
+                onClick={handleToggleViewMode}
                 className="p-1.5 rounded text-primary hover:bg-primary/10 transition-colors flex items-center gap-1"
                 title={viewMode === "single" ? "연속해서 보기" : "한 페이지씩 보기"}
               >
@@ -365,7 +395,7 @@ export default function PdfViewer() {
             <div className="flex items-center gap-1 md:gap-2">
               <div className="flex items-center gap-0.5 md:gap-1 bg-surface-container px-1 py-1 rounded">
                 <button 
-                  onClick={() => { setZoomMode("custom"); setCustomScale(s => Math.max(Math.floor(((zoomMode === "fit" ? fitScale : s) * 100 - 1) / 5) * 5 / 100, 0.5)); }} 
+                  onClick={handleZoomOut} 
                   className="p-1 text-on-surface-variant hover:text-on-surface"
                 >
                   <span className="material-symbols-outlined text-[18px]">remove</span>
@@ -374,13 +404,13 @@ export default function PdfViewer() {
                   {Math.round(displayedScale * state.scale * 100)}%
                 </span>
                 <button 
-                  onClick={() => { setZoomMode("custom"); setCustomScale(s => Math.min(Math.ceil(((zoomMode === "fit" ? fitScale : s) * 100 + 1) / 5) * 5 / 100, 4.0)); }} 
+                  onClick={handleZoomIn} 
                   className="p-1 text-on-surface-variant hover:text-on-surface"
                 >
                   <span className="material-symbols-outlined text-[18px]">add</span>
                 </button>
                 <div className="w-px h-3 bg-outline-variant mx-0.5"></div>
-                <button onClick={() => setZoomMode("fit")} className={`p-1 ${zoomMode === "fit" ? "text-primary bg-primary/10 rounded" : "text-on-surface-variant hover:text-on-surface"}`} title="가로 폭에 맞추기">
+                <button onClick={handleFit} className={`p-1 ${zoomMode === "fit" ? "text-primary bg-primary/10 rounded" : "text-on-surface-variant hover:text-on-surface"}`} title="가로 폭에 맞추기">
                   <span className="material-symbols-outlined text-[18px]">fit_screen</span>
                 </button>
               </div>

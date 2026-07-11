@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useEffect } from "react";
 import db, { PdfMetadata } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";

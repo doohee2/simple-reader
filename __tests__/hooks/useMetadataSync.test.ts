@@ -3,6 +3,11 @@ import { useMetadataSync } from '@/hooks/useMetadataSync';
 import db from '@/lib/db';
 import { supabase } from '@/lib/supabase';
 import { useSession } from 'next-auth/react';
+import { useLiveQuery } from 'dexie-react-hooks';
+
+jest.mock('dexie-react-hooks', () => ({
+  useLiveQuery: jest.fn(),
+}));
 
 jest.mock('@/lib/db', () => {
   const mPdfMetadata = {
@@ -22,9 +27,9 @@ jest.mock('@/lib/db', () => {
 });
 
 jest.mock('@/lib/supabase', () => {
-  const mSelect = jest.fn().mockReturnThis();
+  const mSelect = jest.fn(() => mChain);
   const mUpsert = jest.fn().mockResolvedValue({ error: null });
-  const mDelete = jest.fn().mockReturnThis();
+  const mDelete = jest.fn(() => mChain);
   
   const mChain: any = {
     select: mSelect,
@@ -51,11 +56,12 @@ describe('useMetadataSync', () => {
     (useSession as jest.Mock).mockReturnValue({
       data: { user: { id: 'user-123' } },
     });
+    (useLiveQuery as jest.Mock).mockReturnValue([]);
   });
 
   it('should load local metadata on mount', async () => {
     const mockLocalData = [{ id: '1', fileId: 'file-123', updatedAt: '2026-07-10T10:00:00Z' }];
-    (db.pdfMetadata.toArray as jest.Mock).mockResolvedValueOnce(mockLocalData);
+    (useLiveQuery as jest.Mock).mockReturnValue(mockLocalData);
     
     // Server fetch chain mock
     const eqMock = supabase.from('pdf_metadata').select().eq as unknown as jest.Mock;
