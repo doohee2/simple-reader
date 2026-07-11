@@ -16,6 +16,7 @@ const LazyPage = React.memo(({
   zoomMode,
   customScale,
   containerWidth, 
+  pageBaseWidth,
   onIntersect,
   onPageLoadSuccess
 }: { 
@@ -23,6 +24,7 @@ const LazyPage = React.memo(({
   zoomMode: "fit" | "custom",
   customScale: number,
   containerWidth: number, 
+  pageBaseWidth: number,
   onIntersect: (pageNumber: number) => void,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onPageLoadSuccess: (page: any) => void
@@ -60,6 +62,11 @@ const LazyPage = React.memo(({
   const effectiveWidth = zoomMode === "fit" ? (containerWidth ? containerWidth - 32 : undefined) : undefined;
   const effectiveScale = zoomMode === "fit" ? undefined : customScale;
 
+  const expectedWidth = zoomMode === "fit" 
+    ? (containerWidth ? containerWidth - 32 : 800) 
+    : (pageBaseWidth || 800) * customScale;
+  const expectedHeight = expectedWidth * 1.414;
+
   return (
     <div id={`page-${pageNumber}`} ref={ref} className="mb-4 flex justify-center min-h-[600px] w-full relative">
       {isRendered ? (
@@ -80,7 +87,10 @@ const LazyPage = React.memo(({
           />
         </div>
       ) : (
-        <div className="w-[800px] max-w-full h-[1130px] bg-surface-container shadow-xl animate-pulse" />
+        <div 
+          className="bg-surface-container shadow-xl animate-pulse" 
+          style={{ width: expectedWidth, height: expectedHeight }}
+        />
       )}
     </div>
   );
@@ -454,7 +464,7 @@ export default function PdfViewer() {
       {/* PDF Canvas */}
       <div 
         ref={containerRef}
-        className="flex-1 overflow-auto p-4 flex justify-center bg-surface-dim items-start relative scroll-smooth"
+        className={`flex-1 p-4 bg-surface-dim relative scroll-smooth ${zoomMode === "fit" ? "overflow-y-auto overflow-x-hidden" : "overflow-auto"}`}
         onClick={handleBackgroundClick}
         onMouseUp={handleMouseUp}
       >
@@ -538,6 +548,7 @@ export default function PdfViewer() {
                     zoomMode={zoomMode}
                     customScale={customScale}
                     containerWidth={containerWidth}
+                    pageBaseWidth={pageBaseWidth}
                     onIntersect={handleIntersect} 
                     onPageLoadSuccess={onPageLoadSuccess}
                   />
