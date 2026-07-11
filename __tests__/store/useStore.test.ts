@@ -13,7 +13,7 @@ describe('useStore', () => {
 
   it('should set selected file', () => {
     act(() => {
-      useStore.getState().setSelectedFile('file-123', 'test.pdf');
+      useStore.getState().setSelectedFile('file-123', 'test.pdf', null);
     });
     
     expect(useStore.getState().selectedFileId).toBe('file-123');

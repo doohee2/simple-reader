@@ -51,7 +51,7 @@ export default function StorageManagerModal({ isOpen, onClose }: StorageManagerM
   };
 
   const handleSelectFile = (stat: StorageStat) => {
-    setSelectedFile(stat.fileId, stat.fileName || '알 수 없는 파일');
+    setSelectedFile(stat.fileId, stat.fileName || '알 수 없는 파일', stat.fileSize || null);
     onClose();
   };
 

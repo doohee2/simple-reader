@@ -13,7 +13,7 @@
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS (CSS Variables 기반 자체 디자인 시스템)
 - **State Management**: Zustand (전역 상태 관리)
-- **UI Components**: `lucide-react` (아이콘), `react-resizable-panels` (화면 분할 패널)
+- **UI Components**: `lucide-react` (아이콘), `react-resizable-panels` (화면 분할 패널), `react-zoom-pan-pinch` (PDF 줌/팬 상호작용)
 - **PDF 렌더러**: `react-pdf` (서버사이드 렌더링 충돌 방지를 위해 `next/dynamic`로 동적 로딩 적용. *Next.js 웹팩 컴파일러와의 충돌 방지를 위해 v9.1.0 및 pdfjs-dist v3.11.174 안정화 버전 사용*)
 - **PWA**: `@serwist/next` (서비스 워커, 오프라인 캐싱, manifest 생성)
 
@@ -21,7 +21,7 @@
 - **인증 (Authentication)**: NextAuth.js v5 Beta (Google OAuth - `drive.readonly` 스코프 적용)
 - **AI 연동**: `@google/genai` (Gemini 2.0 Flash 모델 활용, 실시간 Streaming Text 전송)
 - **DB 및 스토리지 (Hybrid Sync Engine)**:
-  - **Local**: `Dexie.js` (IndexedDB를 활용해 수십 MB의 PDF ArrayBuffer와 메타데이터를 0.1초 만에 로컬 캐싱)
+  - **Local**: `Dexie.js` 및 `dexie-react-hooks` (`useLiveQuery`를 활용하여 수십 MB의 PDF ArrayBuffer를 0.1초 만에 캐싱하고, 메타데이터 변경을 UI에 실시간 반영)
   - **Cloud**: `Supabase JS Client` (PostgreSQL 기반으로 로컬에서 작성한 메모와 책갈피를 클라우드에 백그라운드 동기화)
 
 ---
@@ -92,7 +92,7 @@ simple-reader/
    - 브라우저의 개발자 도구(F12) -> `Application` 탭 -> `IndexedDB`에서 `SimpleReaderDB`에 데이터가 들어왔는지 확인합니다.
    - Supabase 대시보드의 `pdf_metadata` 테이블에도 동일한 데이터가 백그라운드로 업로드(Upsert) 되었는지 검증합니다. (새로고침을 해도 메모가 유지되어야 합니다)
 5. **구글 드라이브 전용 서재 지정 및 중첩 탐색 테스트**:
-   - 드라이브 모달을 열고 특정 폴더로 진입한 후 `[이 폴더를 서재로 지정]` 버튼을 클릭합니다.
+   - 드라이브 모달을 열고 특정 폴더로 진입한 후 상단 경로(브레드크럼) 옆의 `[📌]` 핀 버튼을 클릭하여 서재로 지정합니다.
    - 모달을 다시 열었을 때 해당 폴더 안의 PDF 항목들만 보여주는 '내 서재' 모드로 바로 진입하는지 확인합니다.
 6. **로컬 저장소 캐시 최적화 관리 테스트**:
    - 헤더 우측의 `하드 드라이브` 아이콘을 클릭해 저장소 관리자 창을 엽니다.

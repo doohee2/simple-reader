@@ -60,7 +60,7 @@ export default function BottomNavBar() {
         <button
           onClick={() => {
             setBottomSheetTab("none");
-            setSelectedFile(null, null);
+            setSelectedFile(null, null, null);
           }}
           className="flex flex-col items-center justify-center flex-1 h-full gap-1 text-on-surface-variant hover:text-on-surface transition-colors"
         >

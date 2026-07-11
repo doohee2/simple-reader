@@ -21,8 +21,8 @@ export default function Header() {
     setIsStorageManagerOpen
   } = useStore();
 
-  const handleSelectFile = (fileId: string, fileName: string) => {
-    setSelectedFile(fileId, fileName);
+  const handleSelectFile = (fileId: string, fileName: string, fileSize: number | null) => {
+    setSelectedFile(fileId, fileName, fileSize);
     setIsDrivePickerOpen(false);
   };
 
@@ -83,7 +83,7 @@ export default function Header() {
               {/* 파일 닫기 / 열기 */}
               {selectedFileName ? (
                 <button 
-                  onClick={() => setSelectedFile(null, null)}
+                  onClick={() => setSelectedFile(null, null, null)}
                   className={iconButtonClass}
                   title="파일 닫기"
                 >

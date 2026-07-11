@@ -10,6 +10,7 @@ import { useStore } from "@/store/useStore";
 import { usePdfFile } from "@/hooks/usePdfFile";
 import { useMetadataSync } from "@/hooks/useMetadataSync";
 import db from "@/lib/db";
+import DownloadProgressModal from "./DownloadProgressModal";
 
 const LazyPage = React.memo(({ 
   pageNumber, 
@@ -101,8 +102,19 @@ const workerExt = (pdfjs.version || "3.").startsWith("3.") ? "min.js" : "mjs";
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version || "3.11.174"}/build/pdf.worker.${workerExt}`;
 
 export default function PdfViewer() {
-  const { selectedFileId, setSelectedText, clearSelectedText, setActionIntent, viewMode, toggleViewMode, targetPage, setTargetPage } = useStore();
-  const { fileData, isLoading, error } = usePdfFile(selectedFileId);
+  const { selectedFileId, selectedFileName, setSelectedText, clearSelectedText, setActionIntent, viewMode, toggleViewMode, targetPage, setTargetPage } = useStore();
+  const { 
+    fileData, 
+    isLoading, 
+    downloadState, 
+    progress, 
+    loadedBytes, 
+    totalBytes, 
+    error, 
+    startDirectDownload, 
+    startProxyDownload, 
+    cancelDownload 
+  } = usePdfFile(selectedFileId);
 
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);
@@ -503,6 +515,19 @@ export default function PdfViewer() {
             </button>
           </div>
         )}
+        
+        <DownloadProgressModal
+          downloadState={downloadState}
+          progress={progress}
+          loadedBytes={loadedBytes}
+          totalBytes={totalBytes}
+          fileName={selectedFileName}
+          error={error}
+          onConfirmDirect={startDirectDownload}
+          onConfirmProxy={startProxyDownload}
+          onCancel={cancelDownload}
+        />
+
         {isLoading && (
           <div className="flex flex-col items-center justify-center mt-20 text-primary">
             <Loader2 size={40} className="animate-spin mb-4" />
@@ -510,13 +535,14 @@ export default function PdfViewer() {
           </div>
         )}
         
-        {error && (
+        {/* Show error only if it's not handled by the Modal */}
+        {error && downloadState !== "proxy_confirm" && downloadState !== "error" && (
           <div className="p-4 bg-error-container/20 border border-error text-error rounded-lg mt-10">
             {error}
           </div>
         )}
 
-        {!isLoading && !error && fileData && (
+        {!isLoading && downloadState === "success" && fileData && (
           <TransformComponent 
             wrapperStyle={{ width: "100%", height: "max-content", overflow: "visible" }} 
             contentStyle={{ minWidth: "100%", width: "max-content", display: "flex", flexDirection: "column", alignItems: "center" }}

@@ -14,7 +14,7 @@ interface DriveFile {
 interface DrivePickerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectFile: (fileId: string, fileName: string) => void;
+  onSelectFile: (fileId: string, fileName: string, fileSize: number | null) => void;
 }
 
 export default function DrivePickerModal({ isOpen, onClose, onSelectFile }: DrivePickerModalProps) {
@@ -183,7 +183,7 @@ export default function DrivePickerModal({ isOpen, onClose, onSelectFile }: Driv
                 return (
                   <li key={file.id}>
                     <button
-                      onClick={() => isFolder ? handleFolderClick(file.id, file.name) : onSelectFile(file.id, file.name)}
+                      onClick={() => isFolder ? handleFolderClick(file.id, file.name) : onSelectFile(file.id, file.name, file.size ? parseInt(file.size, 10) : null)}
                       className="w-full text-left flex items-center gap-3 p-1 rounded-lg hover:bg-surface-variant border border-transparent hover:border-outline-variant transition-all"
                     >
                       <div className={`p-1.5 rounded-md ${isFolder ? 'bg-secondary-container/20 text-secondary' : 'bg-error-container/20 text-error'}`}>

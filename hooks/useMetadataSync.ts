@@ -21,35 +21,95 @@ export function useMetadataSync(fileId: string | null) {
     []
   );
 
-  // 2. 초기 로드 시 백엔드(Supabase)와 동기화
+  // 2. 초기 로드 시 백엔드(Supabase)와 양방향 동기화
   useEffect(() => {
     if (!fileId || !userId) return;
 
     async function syncWithServer() {
       try {
-        // 백엔드에서 최신 데이터 가져오기
-        const { data: serverData, error } = await supabase
-          .from("pdf_metadata")
-          .select("*")
-          .eq("file_id", fileId)
-          .eq("user_id", userId);
+        // 1. 서버 데이터와 로컬 데이터 각각 가져오기
+        const [ { data: serverData, error }, localData ] = await Promise.all([
+          supabase.from("pdf_metadata").select("*").eq("file_id", fileId as string).eq("user_id", userId as string),
+          db.pdfMetadata.where("fileId").equals(fileId as string).toArray()
+        ]);
 
         if (error) throw error;
 
-        if (serverData && serverData.length > 0) {
-          // 백엔드 데이터를 Dexie 형식으로 변환하여 로컬에 병합 (간이 충돌 해결 로직: 서버 덮어쓰기)
-          const mergedData = serverData.map(item => ({
+        const serverItems = serverData || [];
+        const localItems = localData || [];
+
+        // 2. Map으로 변환하여 비교 용이하게 처리
+        const serverMap = new Map(serverItems.map(item => [item.id, item]));
+        const localMap = new Map(localItems.map(item => [item.id, item]));
+
+        const localNeedsUpload: PdfMetadata[] = [];
+        const serverNeedsDownload: PdfMetadata[] = [];
+
+        // 3. 로컬 데이터 순회: 서버에 없거나 로컬이 더 최신인 경우
+        localItems.forEach(localItem => {
+          const serverItem = serverMap.get(localItem.id);
+          if (!serverItem) {
+            // 서버에 없음 (오프라인에서 생성됨) -> 업로드 필요
+            localNeedsUpload.push(localItem);
+          } else {
+            // 양쪽에 있음 -> 시간 비교
+            const localTime = new Date(localItem.updatedAt).getTime();
+            const serverTime = new Date(serverItem.updated_at).getTime();
+            if (localTime > serverTime) {
+              localNeedsUpload.push(localItem); // 로컬이 더 최신
+            } else if (serverTime > localTime) {
+              // 서버가 더 최신이므로 로컬 덮어쓰기 예약 (DB 형식에 맞춤)
+              serverNeedsDownload.push({
+                id: serverItem.id,
+                fileId: serverItem.file_id,
+                page: serverItem.page,
+                type: serverItem.type,
+                selectedText: serverItem.selected_text,
+                content: serverItem.content,
+                updatedAt: serverItem.updated_at
+              });
+            }
+          }
+        });
+
+        // 4. 서버 데이터 순회: 로컬에 없는 경우
+        serverItems.forEach(serverItem => {
+          if (!localMap.has(serverItem.id)) {
+            // 로컬에 없음 -> 다운로드(로컬 저장) 필요
+            serverNeedsDownload.push({
+              id: serverItem.id,
+              fileId: serverItem.file_id,
+              page: serverItem.page,
+              type: serverItem.type,
+              selectedText: serverItem.selected_text,
+              content: serverItem.content,
+              updatedAt: serverItem.updated_at
+            });
+          }
+        });
+
+        // 5. 일괄 처리 (Batch Operations)
+        if (serverNeedsDownload.length > 0) {
+          await db.pdfMetadata.bulkPut(serverNeedsDownload);
+        }
+
+        if (localNeedsUpload.length > 0) {
+          const upsertData = localNeedsUpload.map(item => ({
             id: item.id,
-            fileId: item.file_id,
+            user_id: userId,
+            file_id: item.fileId,
             page: item.page,
             type: item.type,
-            selectedText: item.selected_text,
+            selected_text: item.selectedText,
             content: item.content,
-            updatedAt: item.updated_at
+            updated_at: item.updatedAt
           }));
-
-          await db.pdfMetadata.bulkPut(mergedData);
+          const { error: upsertError } = await supabase.from("pdf_metadata").upsert(upsertData);
+          if (upsertError) {
+            console.error("Supabase 일괄 업로드 실패:", upsertError);
+          }
         }
+
       } catch (err) {
         console.error("Supabase 동기화 실패 (오프라인 모드 유지):", err);
       }

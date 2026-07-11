@@ -4,7 +4,8 @@ import { persist } from 'zustand/middleware';
 interface StoreState {
   selectedFileId: string | null;
   selectedFileName: string | null;
-  setSelectedFile: (id: string | null, name: string | null) => void;
+  selectedFileSize: number | null;
+  setSelectedFile: (id: string | null, name: string | null, size: number | null) => void;
   
   // 텍스트 선택 관련 상태
   selectedText: string;
@@ -46,7 +47,8 @@ export const useStore = create<StoreState>()(
     (set) => ({
   selectedFileId: null,
   selectedFileName: null,
-  setSelectedFile: (id, name) => set({ selectedFileId: id, selectedFileName: name }),
+  selectedFileSize: null,
+  setSelectedFile: (id, name, size) => set({ selectedFileId: id, selectedFileName: name, selectedFileSize: size }),
   
   selectedText: "",
   currentPage: 1,
@@ -81,6 +83,7 @@ export const useStore = create<StoreState>()(
         theme: state.theme,
         selectedFileId: state.selectedFileId,
         selectedFileName: state.selectedFileName,
+        selectedFileSize: state.selectedFileSize,
         viewMode: state.viewMode
       }),
     }
