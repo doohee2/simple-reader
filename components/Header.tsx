@@ -44,15 +44,15 @@ export default function Header() {
           </div>
         </div>
 
-        {/* 우측: 공통 기능 영역 (모바일은 아이콘 위주, PC는 텍스트 포함) */}
-        <div className="flex items-center gap-1 md:gap-4 flex-shrink-0">
+        {/* 우측: 공통 기능 영역 */}
+        <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
           {/* 테마 토글 */}
           <button 
             onClick={toggleTheme}
-            className="p-1.5 md:p-2 text-on-surface-variant hover:text-primary transition-colors duration-200 rounded-full hover:bg-surface-variant flex-shrink-0"
+            className={iconButtonClass}
             title={theme === "dark" ? "라이트 모드로 전환" : "다크 모드로 전환"}
           >
-            <span className="material-symbols-outlined text-[20px] md:text-[24px]">{theme === "dark" ? "light_mode" : "dark_mode"}</span>
+            <span className={iconClass}>{theme === "dark" ? "light_mode" : "dark_mode"}</span>
           </button>
 
           {/* 인증 상태에 따른 버튼들 */}
@@ -61,43 +61,41 @@ export default function Header() {
               {/* 내 서재 버튼 */}
               <button
                 onClick={() => setIsStorageManagerOpen(true)}
-                className="p-1.5 md:p-2 text-on-surface-variant hover:text-primary transition-colors duration-200 rounded-full hover:bg-surface-variant flex-shrink-0"
+                className={iconButtonClass}
                 title="내 서재"
               >
-                <Library size={20} className="md:w-6 md:h-6" />
+                <span className={iconClass}>local_library</span>
               </button>
 
               {/* 파일 닫기 / 열기 */}
               {selectedFileName ? (
                 <button 
                   onClick={() => setSelectedFile(null, null)}
-                  className="flex items-center gap-1 px-2 md:px-4 py-1 md:py-2 bg-surface-variant text-on-surface hover:bg-surface-bright border border-outline-variant rounded-md transition-colors"
+                  className={iconButtonClass}
                   title="파일 닫기"
                 >
-                  <span className="material-symbols-outlined text-[18px] md:hidden">close</span>
-                  <span className="hidden md:inline text-ui-label-bold">파일 닫기</span>
+                  <span className={iconClass}>close</span>
                 </button>
               ) : (
                 <button 
                   onClick={() => setIsDrivePickerOpen(true)}
-                  className="flex items-center gap-1 px-2 md:px-4 py-1 md:py-2 bg-surface-variant text-on-surface hover:bg-surface-bright border border-outline-variant rounded-md transition-colors"
+                  className={iconButtonClass}
                   title="드라이브 파일 열기"
                 >
-                  <span className="material-symbols-outlined text-[18px] md:hidden">folder_open</span>
-                  <span className="hidden md:inline text-ui-label-bold">드라이브 파일 열기</span>
+                  <span className={iconClass}>folder_open</span>
                 </button>
               )}
               
               {/* 로그아웃 / 프로필 */}
               <button 
                 onClick={() => signOut()}
-                className="p-0.5 md:p-1 rounded-full border-2 border-outline-variant hover:border-primary transition-colors text-on-surface group relative flex-shrink-0 ml-1 md:ml-0"
+                className={`${iconButtonClass} p-0 border-2 border-transparent hover:border-primary group relative`}
                 title="로그아웃"
               >
                 {session.user?.image ? (
-                  <img src={session.user.image} alt="Profile" className="w-6 h-6 md:w-8 md:h-8 rounded-full" />
+                  <img src={session.user.image} alt="Profile" className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover" />
                 ) : (
-                  <span className="material-symbols-outlined w-6 h-6 md:w-8 md:h-8 flex items-center justify-center text-2xl md:text-3xl">account_circle</span>
+                  <span className={iconClass}>account_circle</span>
                 )}
                 {/* 툴팁 (마우스 호버시 로그아웃) */}
                 <div className="absolute hidden md:group-hover:block top-10 right-0 bg-surface-bright p-2 rounded shadow-lg text-xs whitespace-nowrap z-50">
@@ -109,11 +107,10 @@ export default function Header() {
             /* 비로그인 상태 */
             <button 
               onClick={() => signIn("google")}
-              className="flex items-center gap-1 px-2 md:px-4 py-1.5 md:py-2 bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container rounded-md transition-colors ml-1 md:ml-0"
+              className={iconButtonClass}
               title="Google 로그인"
             >
-              <span className="material-symbols-outlined text-[18px] md:hidden">login</span>
-              <span className="hidden md:inline text-ui-label-bold">Google 로그인</span>
+              <span className={iconClass}>login</span>
             </button>
           )}
         </div>

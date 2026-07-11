@@ -10,7 +10,7 @@ import { useStore } from "@/store/useStore";
 import { usePdfFile } from "@/hooks/usePdfFile";
 import { useMetadataSync } from "@/hooks/useMetadataSync";
 
-const LazyPage = React.memo(({ pageNumber, scale, onIntersect }: { pageNumber: number, scale: number, onIntersect: (pageNumber: number) => void }) => {
+const LazyPage = React.memo(({ pageNumber, scale, containerWidth, onIntersect }: { pageNumber: number, scale: number, containerWidth: number, onIntersect: (pageNumber: number) => void }) => {
   const ref = useRef<HTMLDivElement>(null);
   const [isRendered, setIsRendered] = useState(false);
 
@@ -47,6 +47,7 @@ const LazyPage = React.memo(({ pageNumber, scale, onIntersect }: { pageNumber: n
         <div className="shadow-xl bg-white transition-transform origin-top">
           <Page
             pageNumber={pageNumber}
+            width={containerWidth ? containerWidth - 32 : undefined}
             scale={scale}
             renderTextLayer={true}
             renderAnnotationLayer={true}
@@ -75,9 +76,21 @@ export default function PdfViewer() {
 
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);
-  const nativeScale = 1.2; // Native react-pdf rendering resolution
+  const [nativeScale, setNativeScale] = useState<number>(1.0); // 1.0 = fit to width
+  const [containerWidth, setContainerWidth] = useState<number>(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    setContainerWidth(el.clientWidth);
+    const observer = new ResizeObserver((entries) => {
+      setContainerWidth(entries[0].contentRect.width);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
 
@@ -170,8 +183,30 @@ export default function PdfViewer() {
       wheel={{ wheelDisabled: true }} // Disable wheel zoom to allow native vertical scroll
       pinch={{ step: 5 }}
       doubleClick={{ disabled: true }}
+      onZoomStop={(ref) => {
+        const cssScale = ref.state.scale;
+        if (Math.abs(cssScale - 1) > 0.05) {
+          const el = containerRef.current;
+          const scrollY = el ? el.scrollTop : 0;
+          const scrollX = el ? el.scrollLeft : 0;
+          
+          setNativeScale(prev => {
+            const next = Math.min(Math.max(0.5, prev * cssScale), 4.0);
+            const ratio = next / prev;
+            
+            requestAnimationFrame(() => {
+              if (el) {
+                el.scrollTop = scrollY * ratio;
+                el.scrollLeft = scrollX * ratio;
+              }
+            });
+            return next;
+          });
+          ref.resetTransform(0);
+        }
+      }}
     >
-      {({ zoomIn, zoomOut, state }) => (
+      {({ state }) => (
         <section className="flex-1 flex flex-col min-w-[300px] bg-surface-container-lowest relative h-full">
           {/* Toolbar */}
           <div className="h-12 bg-surface-container-low border-b border-outline-variant flex items-center justify-between px-2 md:px-4 flex-shrink-0">
@@ -215,14 +250,18 @@ export default function PdfViewer() {
             </div>
             <div className="flex items-center gap-2 md:gap-4">
               <div className="flex items-center gap-1 md:gap-2 bg-surface-container px-2 py-1 rounded">
-                <button onClick={() => zoomOut()} className="p-1 text-on-surface-variant hover:text-on-surface">
+                <button onClick={() => setNativeScale(s => Math.max(s - 0.2, 0.5))} className="p-1 text-on-surface-variant hover:text-on-surface">
                   <span className="material-symbols-outlined text-[18px]">remove</span>
                 </button>
                 <span className="text-ui-label-sm text-on-surface w-10 md:w-12 text-center">
-                  {Math.round(state.scale * 100)}%
+                  {Math.round(nativeScale * state.scale * 100)}%
                 </span>
-                <button onClick={() => zoomIn()} className="p-1 text-on-surface-variant hover:text-on-surface">
+                <button onClick={() => setNativeScale(s => Math.min(s + 0.2, 4.0))} className="p-1 text-on-surface-variant hover:text-on-surface">
                   <span className="material-symbols-outlined text-[18px]">add</span>
+                </button>
+                <div className="w-px h-3 bg-outline-variant mx-0.5"></div>
+                <button onClick={() => setNativeScale(1.0)} className="p-1 text-on-surface-variant hover:text-on-surface" title="가로 폭에 맞추기">
+                  <span className="material-symbols-outlined text-[18px]">fit_screen</span>
                 </button>
               </div>
               <button 
@@ -304,6 +343,7 @@ export default function PdfViewer() {
                 <div className="shadow-2xl bg-white transition-transform origin-top">
                   <Page
                     pageNumber={pageNumber}
+                    width={containerWidth ? containerWidth - 32 : undefined}
                     scale={nativeScale}
                     renderTextLayer={true}
                     renderAnnotationLayer={true}
@@ -316,6 +356,7 @@ export default function PdfViewer() {
                     key={i + 1} 
                     pageNumber={i + 1} 
                     scale={nativeScale} 
+                    containerWidth={containerWidth}
                     onIntersect={handleIntersect} 
                   />
                 ))

@@ -24,6 +24,10 @@ interface StoreState {
   isDrivePickerOpen: boolean;
   setIsDrivePickerOpen: (isOpen: boolean) => void;
 
+  // 내 서재 모달 상태
+  isStorageManagerOpen: boolean;
+  setIsStorageManagerOpen: (isOpen: boolean) => void;
+
   // PDF 뷰 모드
   viewMode: "single" | "continuous";
   toggleViewMode: () => void;
@@ -54,6 +58,9 @@ export const useStore = create<StoreState>()(
 
   isDrivePickerOpen: false,
   setIsDrivePickerOpen: (isOpen) => set({ isDrivePickerOpen: isOpen }),
+
+  isStorageManagerOpen: false,
+  setIsStorageManagerOpen: (isOpen) => set({ isStorageManagerOpen: isOpen }),
 
   viewMode: "single",
   toggleViewMode: () => set((state) => ({ viewMode: state.viewMode === "single" ? "continuous" : "single" })),
