@@ -130,6 +130,7 @@ export default function PdfViewer() {
   
   const ignoreIntersectRef = useRef(false);
   const pendingScrollRef = useRef<{ x: number; y: number } | null>(null);
+  const scaleDisplayRef = useRef<HTMLSpanElement>(null);
 
   useLayoutEffect(() => {
     if (pendingScrollRef.current && containerRef.current) {
@@ -357,6 +358,13 @@ export default function PdfViewer() {
       wheel={{ wheelDisabled: true }} // Disable wheel zoom to allow native vertical scroll
       pinch={{ step: 5 }}
       doubleClick={{ disabled: true }}
+      onTransformed={(ref) => {
+        if (scaleDisplayRef.current) {
+          const perceived = currentScale * ref.state.scale;
+          const bounded = Math.min(Math.max(0.25, perceived), 8.0);
+          scaleDisplayRef.current.innerText = `${Math.round(bounded * 100)}%`;
+        }
+      }}
       onZoomStop={(ref) => {
         const cssScale = ref.state.scale;
         if (Math.abs(cssScale - 1) > 0.01) {
@@ -499,7 +507,7 @@ export default function PdfViewer() {
                 >
                   <span className="material-symbols-outlined text-[18px]">remove</span>
                 </button>
-                <span className="text-ui-label-sm text-on-surface w-10 text-center whitespace-nowrap">
+                <span ref={scaleDisplayRef} className="text-ui-label-sm text-on-surface w-10 text-center whitespace-nowrap">
                   {Math.round(displayedScale * state.scale * 100)}%
                 </span>
                 <button 
