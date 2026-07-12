@@ -250,8 +250,8 @@ export default function PdfViewer() {
       return;
     }
 
-    // 2. 단일 페이지 모드일 때 좌/우 엣지 클릭 네비게이션
-    if (viewMode === "single" && containerRef.current) {
+    // 2. 단일 페이지 + Fit 모드일 때만 좌/우 엣지 클릭 네비게이션 허용 (확대 상태에서는 패닝 동작 보호)
+    if (viewMode === "single" && zoomMode === "fit" && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
       const clickX = e.clientX - rect.left;
       const width = rect.width;
@@ -365,11 +365,16 @@ export default function PdfViewer() {
           const currentScale = zoomMode === "fit" ? fitScale : customScale;
           const newScale = Math.min(Math.max(0.5, currentScale * cssScale), 4.0);
           
+          const wasFit = zoomMode === "fit";
           setZoomMode("custom");
           setCustomScale(newScale);
           
+          // CSS scale이 해제되고 Canvas의 Intrinsic 크기가 커질 때 시각적 위치를 유지하기 위한 스크롤 계산
+          // Fit 모드에서 Custom 모드로 전환 시, flexbox center가 해제되면서 16px 왼쪽 여백이 사라집니다. 이를 보정합니다.
+          const xOffset = wasFit ? (16 * cssScale) : 0;
+          
           pendingScrollRef.current = {
-            x: scrollX - ref.state.positionX,
+            x: scrollX - ref.state.positionX - xOffset,
             y: scrollY - ref.state.positionY
           };
           
@@ -592,20 +597,20 @@ export default function PdfViewer() {
           <TransformComponent 
             wrapperClass={`!touch-${zoomMode === "fit" ? "pan-y" : "auto"}`}
             wrapperStyle={{ width: "100%", height: "auto", overflow: "visible", touchAction: zoomMode === "fit" ? "pan-y" : "auto", userSelect: "text" }} 
-            contentStyle={{ minWidth: "100%", width: "auto", display: "flex", flexDirection: "column", alignItems: "center", userSelect: "text" }}
+            contentStyle={{ minWidth: "100%", width: "auto", display: "flex", flexDirection: "column", alignItems: zoomMode === "fit" ? "center" : "flex-start", userSelect: "text" }}
           >
             <div 
               onMouseDown={(e) => e.stopPropagation()} 
               onTouchStart={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
               onTouchMove={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
-              className="w-full flex flex-col items-center"
+              className={`w-full flex flex-col ${zoomMode === "fit" ? "items-center" : "items-start"}`}
             >
               <Document
                 file={fileData}
                 onLoadSuccess={onDocumentLoadSuccess}
                 loading={<Loader2 size={40} className="animate-spin text-primary m-10" />}
                 error={<div className="p-4 text-error">문서를 렌더링할 수 없습니다.</div>}
-                className="w-full flex flex-col items-center pdf-document"
+                className={`w-full flex flex-col ${zoomMode === "fit" ? "items-center" : "items-start"} pdf-document`}
               >
                 {viewMode === "single" ? (
                   <div id={`page-${pageNumber}`} className="shadow-2xl bg-white transition-transform origin-top">
