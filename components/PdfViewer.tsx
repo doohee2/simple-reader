@@ -314,7 +314,7 @@ export default function PdfViewer() {
       minScale={0.5}
       maxScale={4}
       panning={{ 
-        disabled: true, 
+        activationKeys: ["Shift"], 
       }}
       wheel={{ wheelDisabled: true }} // Disable wheel zoom to allow native vertical scroll
       pinch={{ step: 5 }}
