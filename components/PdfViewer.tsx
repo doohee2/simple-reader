@@ -314,7 +314,7 @@ export default function PdfViewer() {
       minScale={0.5}
       maxScale={4}
       panning={{ 
-        activationKeys: ["Shift"], 
+        disabled: true, 
       }}
       wheel={{ wheelDisabled: true }} // Disable wheel zoom to allow native vertical scroll
       pinch={{ step: 5 }}
@@ -557,43 +557,51 @@ export default function PdfViewer() {
 
         {!isLoading && downloadState === "success" && fileData && (
           <TransformComponent 
-            wrapperStyle={{ width: "100%", height: "auto", overflow: "visible", touchAction: "auto", userSelect: "text" }} 
+            wrapperClass={`!touch-${zoomMode === "fit" ? "pan-y" : "auto"}`}
+            wrapperStyle={{ width: "100%", height: "auto", overflow: "visible", touchAction: zoomMode === "fit" ? "pan-y" : "auto", userSelect: "text" }} 
             contentStyle={{ minWidth: "100%", width: "auto", display: "flex", flexDirection: "column", alignItems: "center", userSelect: "text" }}
           >
-            <Document
-              file={fileData}
-              onLoadSuccess={onDocumentLoadSuccess}
-              loading={<Loader2 size={40} className="animate-spin text-primary m-10" />}
-              error={<div className="p-4 text-error">문서를 렌더링할 수 없습니다.</div>}
-              className="w-full flex flex-col items-center pdf-document"
+            <div 
+              onMouseDown={(e) => e.stopPropagation()} 
+              onTouchStart={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
+              onTouchMove={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
+              className="w-full flex flex-col items-center"
             >
-              {viewMode === "single" ? (
-                <div id={`page-${pageNumber}`} className="shadow-2xl bg-white transition-transform origin-top">
-                  <Page
-                    pageNumber={pageNumber}
-                    width={zoomMode === "fit" ? (containerWidth ? containerWidth - 32 : undefined) : undefined}
-                    scale={zoomMode === "fit" ? undefined : customScale}
-                    onLoadSuccess={onPageLoadSuccess}
-                    renderTextLayer={true}
-                    renderAnnotationLayer={true}
-                    className="pdf-page"
-                  />
-                </div>
-              ) : (
-                Array.from({ length: numPages }, (_, i) => (
-                  <LazyPage 
-                    key={i + 1} 
-                    pageNumber={i + 1} 
-                    zoomMode={zoomMode}
-                    customScale={customScale}
-                    containerWidth={containerWidth}
-                    pageBaseWidth={pageBaseWidth}
-                    onIntersect={handleIntersect} 
-                    onPageLoadSuccess={onPageLoadSuccess}
-                  />
-                ))
-              )}
-            </Document>
+              <Document
+                file={fileData}
+                onLoadSuccess={onDocumentLoadSuccess}
+                loading={<Loader2 size={40} className="animate-spin text-primary m-10" />}
+                error={<div className="p-4 text-error">문서를 렌더링할 수 없습니다.</div>}
+                className="w-full flex flex-col items-center pdf-document"
+              >
+                {viewMode === "single" ? (
+                  <div id={`page-${pageNumber}`} className="shadow-2xl bg-white transition-transform origin-top">
+                    <Page
+                      pageNumber={pageNumber}
+                      width={zoomMode === "fit" ? (containerWidth ? containerWidth - 32 : undefined) : undefined}
+                      scale={zoomMode === "fit" ? undefined : customScale}
+                      onLoadSuccess={onPageLoadSuccess}
+                      renderTextLayer={true}
+                      renderAnnotationLayer={true}
+                      className="pdf-page"
+                    />
+                  </div>
+                ) : (
+                  Array.from({ length: numPages }, (_, i) => (
+                    <LazyPage 
+                      key={i + 1} 
+                      pageNumber={i + 1} 
+                      zoomMode={zoomMode}
+                      customScale={customScale}
+                      containerWidth={containerWidth}
+                      pageBaseWidth={pageBaseWidth}
+                      onIntersect={handleIntersect} 
+                      onPageLoadSuccess={onPageLoadSuccess}
+                    />
+                  ))
+                )}
+              </Document>
+            </div>
           </TransformComponent>
         )}
       </div>
