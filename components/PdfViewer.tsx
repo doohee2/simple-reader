@@ -127,6 +127,23 @@ export default function PdfViewer() {
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const transformRef = useRef<any>(null);
+  
+  const ignoreIntersectRef = useRef(false);
+
+  const scrollToPage = useCallback((p: number, isContinuous: boolean, delay = 0) => {
+    if (!isContinuous) return;
+    
+    ignoreIntersectRef.current = true;
+    setTimeout(() => {
+      const el = document.getElementById(`page-${p}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "auto", block: "start" });
+      }
+      setTimeout(() => {
+        ignoreIntersectRef.current = false;
+      }, 200);
+    }, delay);
+  }, []);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -171,15 +188,7 @@ export default function PdfViewer() {
           const latestBookmarkPage = bookmarks[0].page;
           setPageNumber(latestBookmarkPage);
           
-          // 연속 보기 모드일 경우 해당 DOM 요소로 스크롤 이동
-          if (viewMode === "continuous") {
-            setTimeout(() => {
-              const el = document.getElementById(`page-${latestBookmarkPage}`);
-              if (el) {
-                el.scrollIntoView({ behavior: "smooth", block: "start" });
-              }
-            }, 500); // 렌더링 대기 후 스크롤
-          }
+          scrollToPage(latestBookmarkPage, viewMode === "continuous", 500);
           return;
         }
       } catch (err) {
@@ -237,11 +246,19 @@ export default function PdfViewer() {
   const nextPage = () => changePage(1);
   
   const handleToggleViewMode = () => {
+    const nextMode = viewMode === "single" ? "continuous" : "single";
     toggleViewMode();
     transformRef.current?.resetTransform(0);
+    
+    if (nextMode === "continuous") {
+      scrollToPage(pageNumber, true, 0);
+    } else {
+      if (containerRef.current) containerRef.current.scrollTop = 0;
+    }
   };
 
   const handleIntersect = useCallback((page: number) => {
+    if (ignoreIntersectRef.current) return;
     // 편집 모드가 아닐 때만 스크롤 페이지 감지 업데이트
     if (!isEditingPage) {
       setPageNumber(page);
@@ -253,9 +270,7 @@ export default function PdfViewer() {
     const p = parseInt(pageInput);
     if (!isNaN(p) && p >= 1 && p <= numPages) {
       setPageNumber(p);
-      if (viewMode === "continuous") {
-        document.getElementById(`page-${p}`)?.scrollIntoView({ behavior: "smooth" });
-      }
+      scrollToPage(p, viewMode === "continuous");
     }
     setIsEditingPage(false);
   };
@@ -279,15 +294,10 @@ export default function PdfViewer() {
     if (targetPage !== null) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setPageNumber(targetPage);
-      if (viewMode === "continuous") {
-        const el = document.getElementById(`page-${targetPage}`);
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
-      }
+      scrollToPage(targetPage, viewMode === "continuous");
       setTargetPage(null);
     }
-  }, [targetPage, viewMode, setTargetPage]);
+  }, [targetPage, viewMode, setTargetPage, scrollToPage]);
 
   if (!selectedFileId) {
     return (
@@ -303,7 +313,9 @@ export default function PdfViewer() {
       initialScale={1}
       minScale={0.5}
       maxScale={4}
-      panning={{ disabled: true }} // Disable JS panning completely to allow native scroll (touch & mouse)
+      panning={{ 
+        activationKeys: ["Shift"], 
+      }}
       wheel={{ wheelDisabled: true }} // Disable wheel zoom to allow native vertical scroll
       pinch={{ step: 5 }}
       doubleClick={{ disabled: true }}
@@ -553,7 +565,7 @@ export default function PdfViewer() {
               onLoadSuccess={onDocumentLoadSuccess}
               loading={<Loader2 size={40} className="animate-spin text-primary m-10" />}
               error={<div className="p-4 text-error">문서를 렌더링할 수 없습니다.</div>}
-              className="w-full flex flex-col items-center"
+              className="w-full flex flex-col items-center pdf-document"
             >
               {viewMode === "single" ? (
                 <div id={`page-${pageNumber}`} className="shadow-2xl bg-white transition-transform origin-top">

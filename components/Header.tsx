@@ -40,38 +40,38 @@ export default function Header() {
       <header className="flex justify-between items-center w-full px-2 md:px-8 h-14 md:h-16 bg-surface border-b border-outline-variant flex-shrink-0 z-10 gap-2">
         {/* 좌측: 로고 및 파일명 */}
         <div className="flex items-center gap-1 md:gap-4 flex-1 min-w-0">
-          <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
-            <span className="material-symbols-outlined text-primary text-xl md:text-2xl font-bold">menu_book</span>
-            <svg viewBox="0 0 340 60" className={`h-[28px] sm:h-[34px] w-auto drop-shadow-sm ${selectedFileName ? 'hidden sm:block' : 'block'}`} fill="none" xmlns="http://www.w3.org/2000/svg" style={{ fontFamily: 'var(--font-plus-jakarta-sans), sans-serif' }}>
-              <text x="0" y="45" fontWeight="800" fontSize="42" letterSpacing="-0.02em" className="fill-[#0066ff] dark:fill-[#d0ebff] transition-colors duration-300">Simple</text>
-              <circle cx="18" cy="10" r="4" className="fill-[#0066ff] dark:fill-[#d0ebff] transition-colors duration-300"/>
-              <text x="150" y="45" fontWeight="700" fontSize="42" letterSpacing="-0.02em" className="fill-[#1e293b] dark:fill-[#ffffff] transition-colors duration-300">Reader</text>
-            </svg>
-            <button 
-              onClick={() => setIsInfoModalOpen(true)} 
-              className="p-1 text-on-surface-variant hover:text-primary rounded-full transition-colors ml-1"
-              title="앱 정보"
-            >
-              <span className="material-symbols-outlined text-[18px] md:text-[20px]">info</span>
-            </button>
-          </div>
-          <div className="h-4 md:h-6 w-px bg-outline-variant mx-1 md:mx-2 hidden sm:block"></div>
-          <div className="flex flex-col min-w-0 flex-1">
-            {selectedFileName ? (
+          <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
+            <span className={`material-symbols-outlined text-primary text-xl md:text-2xl font-bold ${selectedFileName ? 'hidden sm:block' : 'block'}`}>menu_book</span>
+            <div className="flex items-center">
+              <svg viewBox="0 0 340 60" className={`h-[28px] sm:h-[34px] w-auto drop-shadow-sm ${selectedFileName ? 'hidden sm:block' : 'block'}`} fill="none" xmlns="http://www.w3.org/2000/svg" style={{ fontFamily: 'var(--font-plus-jakarta-sans), sans-serif' }}>
+                <text x="0" y="45" fontWeight="800" fontSize="42" letterSpacing="-0.02em" className="fill-[#0066ff] dark:fill-[#d0ebff] transition-colors duration-300">Simple</text>
+                <circle cx="18" cy="10" r="4" className="fill-[#0066ff] dark:fill-[#d0ebff] transition-colors duration-300"/>
+                <text x="150" y="45" fontWeight="700" fontSize="42" letterSpacing="-0.02em" className="fill-current text-on-surface transition-colors duration-300">Reader</text>
+              </svg>
               <button 
-                onClick={() => setIsBookInfoModalOpen(true)}
-                className="text-sm md:text-title-sm font-bold text-on-surface hover:text-primary transition-colors text-left flex items-center gap-1 md:gap-2 min-w-0"
-                title={selectedFileName}
+                onClick={() => setIsInfoModalOpen(true)} 
+                className="text-on-surface-variant hover:text-primary rounded-full transition-colors mt-[6px] -ml-2"
+                title="앱 정보"
               >
-                <span className="truncate">{selectedFileName}</span>
-                <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-secondary flex-shrink-0" title="동기화 완료"></span>
+                <span className="material-symbols-outlined text-[16px]">info</span>
               </button>
-            ) : (
-              <span className="text-sm md:text-title-sm font-bold text-on-surface-variant italic truncate">
-                파일을 열어주세요
-              </span>
-            )}
+            </div>
           </div>
+          {selectedFileName && (
+            <>
+              <div className="h-4 md:h-6 w-px bg-outline-variant mx-1 md:mx-2 hidden sm:block"></div>
+              <div className="flex flex-col min-w-0 flex-1">
+                <button 
+                  onClick={() => setIsBookInfoModalOpen(true)}
+                  className="text-sm md:text-title-sm font-bold text-on-surface hover:text-primary transition-colors text-left flex items-center gap-1 md:gap-2 min-w-0"
+                  title={selectedFileName}
+                >
+                  <span className="truncate">{selectedFileName}</span>
+                  <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-secondary flex-shrink-0" title="동기화 완료"></span>
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         {/* 우측: 공통 기능 영역 */}
@@ -171,9 +171,13 @@ export default function Header() {
             <button onClick={() => setIsInfoModalOpen(false)} className="absolute top-4 right-4 text-on-surface-variant hover:text-on-surface">
               <X size={20} />
             </button>
-            <div className="flex items-center gap-2 mb-4 text-primary">
-              <span className="material-symbols-outlined text-2xl">info</span>
-              <h3 className="text-title-md font-bold text-on-surface">앱 정보</h3>
+            <div className="flex items-center justify-center mb-6 mt-2 gap-2 text-primary">
+              <span className="material-symbols-outlined text-[28px]">info</span>
+              <svg viewBox="0 0 340 60" className="h-[36px] w-auto drop-shadow-sm" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ fontFamily: 'var(--font-plus-jakarta-sans), sans-serif' }}>
+                <text x="0" y="45" fontWeight="800" fontSize="42" letterSpacing="-0.02em" className="fill-[#0066ff] dark:fill-[#d0ebff] transition-colors duration-300">Simple</text>
+                <circle cx="18" cy="10" r="4" className="fill-[#0066ff] dark:fill-[#d0ebff] transition-colors duration-300"/>
+                <text x="150" y="45" fontWeight="700" fontSize="42" letterSpacing="-0.02em" className="fill-current text-on-surface transition-colors duration-300">Reader</text>
+              </svg>
             </div>
             <p className="text-ui-body text-on-surface mb-6 leading-relaxed">
               {APP_INFO.DESCRIPTION}

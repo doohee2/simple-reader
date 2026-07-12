@@ -19,7 +19,7 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
     }
   }, [forceTab]);
 
-  const { selectedFileId, selectedText, currentPage, actionIntent, clearActionIntent, setTargetPage } = useStore();
+  const { selectedFileId, selectedText, currentPage, actionIntent, clearActionIntent, setTargetPage, clearSelectedText } = useStore();
   
   const [selectedModel, setSelectedModel] = useState("gemini-3.1-flash-lite");
   const [customPrompt, setCustomPrompt] = useState("설명 없이 번역한 결과만");
@@ -168,9 +168,18 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
               <span className="text-ui-label-sm text-on-surface-variant uppercase tracking-wider flex justify-between items-center">
                 <span>선택된 문장</span>
                 {selectedText && (
-                  <span className="text-primary text-[10px] bg-primary/10 px-1.5 py-0.5 rounded">
-                    Page {currentPage}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-primary text-[10px] bg-primary/10 px-1.5 py-0.5 rounded">
+                      Page {currentPage}
+                    </span>
+                    <button 
+                      onClick={clearSelectedText}
+                      className="p-1 flex items-center justify-center hover:bg-surface-variant rounded-full text-on-surface-variant hover:text-error transition-colors -mr-1"
+                      title="선택 영역 취소"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">close</span>
+                    </button>
+                  </div>
                 )}
               </span>
               <div className="bg-surface-container-low border-l-2 border-outline-variant p-4 rounded-r-lg min-h-[60px] flex items-center">
