@@ -19,8 +19,8 @@ export default function BookInfoModal({ isOpen, onClose, fileId, fileName, fileS
   useEffect(() => {
     if (isOpen && fileId) {
       db.pdfMetadata.where("fileId").equals(fileId).toArray().then(metadata => {
-        setMemoCount(metadata.filter(m => m.type === "memo").length);
-        setBookmarkCount(metadata.filter(m => m.type === "bookmark").length);
+        setMemoCount(metadata.filter(m => m.type === "memo" && !m.deletedAt).length);
+        setBookmarkCount(metadata.filter(m => m.type === "bookmark" && !m.deletedAt).length);
       }).catch(err => console.error("Failed to fetch metadata counts", err));
     }
   }, [isOpen, fileId]);
