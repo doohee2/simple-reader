@@ -314,7 +314,7 @@ export default function PdfViewer() {
       minScale={0.5}
       maxScale={4}
       panning={{ 
-        activationKeys: ["Shift"], 
+        disabled: true, 
       }}
       wheel={{ wheelDisabled: true }} // Disable wheel zoom to allow native vertical scroll
       pinch={{ step: 5 }}
@@ -489,7 +489,7 @@ export default function PdfViewer() {
       {/* PDF Canvas */}
       <div 
         ref={containerRef}
-        className={`flex-1 p-4 bg-surface-dim relative scroll-smooth ${zoomMode === "fit" ? "overflow-y-auto overflow-x-hidden" : "overflow-auto"}`}
+        className={`flex-1 p-4 bg-surface-dim relative ${zoomMode === "fit" ? "overflow-y-auto overflow-x-hidden" : "overflow-auto"}`}
         onClick={handleBackgroundClick}
         onMouseUp={handleMouseUp}
       >
@@ -557,8 +557,8 @@ export default function PdfViewer() {
 
         {!isLoading && downloadState === "success" && fileData && (
           <TransformComponent 
-            wrapperStyle={{ width: "100%", height: "auto", overflow: "visible", touchAction: "auto" }} 
-            contentStyle={{ minWidth: "100%", width: "auto", display: "flex", flexDirection: "column", alignItems: "center" }}
+            wrapperStyle={{ width: "100%", height: "auto", overflow: "visible", touchAction: "auto", userSelect: "text" }} 
+            contentStyle={{ minWidth: "100%", width: "auto", display: "flex", flexDirection: "column", alignItems: "center", userSelect: "text" }}
           >
             <Document
               file={fileData}
