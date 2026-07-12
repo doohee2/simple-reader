@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import db, { PdfMetadata } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
@@ -7,7 +7,8 @@ import { useStore } from "@/store/useStore";
 
 export function useMetadataSync(fileId: string | null) {
   const { data: session } = useSession();
-  const userId = session?.user?.id;
+  // 동일한 구글 계정임에도 기기마다 id(sub)가 다르게 발급되는 현상을 방지하기 위해 이메일을 최우선 식별자로 사용합니다.
+  const userId = session?.user?.email || session?.user?.id;
 
   // 1. 로컬(Dexie)에서 메타데이터 실시간 불러오기
   const metadataList = useLiveQuery(
@@ -23,17 +24,13 @@ export function useMetadataSync(fileId: string | null) {
     []
   );
 
-  // 2. 초기 로드 시 백엔드(Supabase)와 양방향 동기화
-  useEffect(() => {
-    if (!fileId || !userId) return;
+  const [isSyncing, setIsSyncing] = useState(false);
 
-    let isSyncing = false;
+  const manualSync = useCallback(async () => {
+    if (!fileId || !userId || isSyncing) return;
+    setIsSyncing(true);
 
-    async function syncWithServer() {
-      if (isSyncing) return;
-      isSyncing = true;
-
-      try {
+    try {
         // 0. 30일 초과된 Soft Delete 항목 영구 삭제 (서버 및 로컬)
         try {
           const thirtyDaysAgo = new Date();
@@ -149,20 +146,22 @@ export function useMetadataSync(fileId: string | null) {
       } catch (err) {
         console.error("Supabase 동기화 실패 (오프라인 모드 유지):", err);
       } finally {
-        isSyncing = false;
+        setIsSyncing(false);
       }
-    }
+  }, [fileId, userId, isSyncing]);
 
+  // 2. 백엔드(Supabase) 동기화 스케줄링
+  useEffect(() => {
     // 1. 초기 1회 실행
-    syncWithServer();
+    manualSync();
 
     // 2. 10분(600,000ms) 주기 정기 폴링
-    const intervalId = setInterval(syncWithServer, 600000);
+    const intervalId = setInterval(manualSync, 600000);
 
     return () => {
       clearInterval(intervalId);
     };
-  }, [fileId, userId]);
+  }, [manualSync]);
 
   // 3. 새로운 메타데이터 저장 (로컬 저장 후 백그라운드 동기화)
   const saveMetadata = async (
@@ -259,5 +258,5 @@ export function useMetadataSync(fileId: string | null) {
     }
   };
 
-  return { metadataList: metadataList || [], saveMetadata, updateMetadata, deleteMetadata };
+  return { metadataList: metadataList || [], saveMetadata, updateMetadata, deleteMetadata, manualSync, isSyncing };
 }

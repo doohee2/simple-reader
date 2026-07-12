@@ -27,7 +27,7 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
   const [isTranslating, setIsTranslating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { metadataList, saveMetadata, updateMetadata, deleteMetadata } = useMetadataSync(selectedFileId);
+  const { metadataList, saveMetadata, updateMetadata, deleteMetadata, manualSync, isSyncing } = useMetadataSync(selectedFileId);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
@@ -402,6 +402,21 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
                 </div>
               ))
             )}
+
+            {/* Sync Button Area */}
+            <div className="mt-4 border-t border-outline-variant pt-6 pb-2">
+              <button 
+                onClick={() => manualSync()}
+                disabled={isSyncing}
+                className="w-full py-2.5 flex items-center justify-center gap-2 bg-surface-container border border-outline-variant rounded-xl text-on-surface hover:bg-surface-variant hover:text-primary transition-all disabled:opacity-50 font-ui-label-bold shadow-sm"
+              >
+                <span className={`material-symbols-outlined text-[18px] ${isSyncing ? "animate-spin" : ""}`}>sync</span>
+                {isSyncing ? "동기화 중..." : "서버와 즉시 동기화"}
+              </button>
+              <p className="text-center text-[10px] text-on-surface-variant mt-2">
+                로컬에만 있는 메모는 서버로, 서버에만 있는 메모는 로컬로 가져옵니다.
+              </p>
+            </div>
           </div>
         )}
       </div>
