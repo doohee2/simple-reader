@@ -145,6 +145,14 @@ export default function PdfViewer() {
     }
   }, [customScale, zoomMode]);
 
+  useLayoutEffect(() => {
+    if (scaleDisplayRef.current) {
+      const fitScale = (containerWidth && pageBaseWidth) ? (containerWidth - 32) / pageBaseWidth : 1;
+      const cScale = zoomMode === "fit" ? fitScale : customScale;
+      scaleDisplayRef.current.innerText = `${Math.round(cScale * 100)}%`;
+    }
+  }, [customScale, zoomMode, containerWidth, pageBaseWidth]);
+
   const scrollToPage = useCallback((p: number, isContinuous: boolean, delay = 0) => {
     if (!isContinuous) return;
     
@@ -364,6 +372,7 @@ export default function PdfViewer() {
       pinch={{ step: 5 }}
       doubleClick={{ disabled: true }}
       onTransform={(ref, state) => {
+        if (pendingResetTransformRef.current) return;
         if (scaleDisplayRef.current) {
           const perceived = currentScale * state.scale;
           const bounded = Math.min(Math.max(0.25, perceived), 8.0);
@@ -452,7 +461,7 @@ export default function PdfViewer() {
           
           setZoomMode("custom");
           setCustomScale(Math.min(nextPct / 100, 8.0));
-          transformRef.current?.resetTransform(0);
+          pendingResetTransformRef.current = true;
         };
 
         const handleZoomOut = () => {
@@ -466,7 +475,7 @@ export default function PdfViewer() {
           
           setZoomMode("custom");
           setCustomScale(Math.max(nextPct / 100, 0.25));
-          transformRef.current?.resetTransform(0);
+          pendingResetTransformRef.current = true;
         };
 
         const handleFit = () => {
@@ -547,7 +556,6 @@ export default function PdfViewer() {
                   <span className="material-symbols-outlined text-[18px]">remove</span>
                 </button>
                 <span ref={scaleDisplayRef} className="text-ui-label-sm text-on-surface w-10 text-center whitespace-nowrap">
-                  {Math.round(displayedScale * (pendingResetTransformRef.current ? 1 : state.scale) * 100)}%
                 </span>
                 <button 
                   onClick={handleZoomIn} 
