@@ -3,7 +3,10 @@
 import { useState, useEffect } from "react";
 import { X, Library, Trash2, Database, FileText, CheckCircle2, Clock } from "lucide-react";
 import { getStorageStats, deletePdfCache, clearAllPdfCaches, StorageStat } from "@/lib/db";
+import db from "@/lib/db";
 import { useStore } from "@/store/useStore";
+import { useSession } from "next-auth/react";
+import { supabase } from "@/lib/supabase";
 
 interface StorageManagerModalProps {
   isOpen: boolean;
@@ -12,6 +15,7 @@ interface StorageManagerModalProps {
 
 export default function StorageManagerModal({ isOpen, onClose }: StorageManagerModalProps) {
   const { setSelectedFile } = useStore();
+  const { data: session } = useSession();
   const [stats, setStats] = useState<StorageStat[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -35,17 +39,25 @@ export default function StorageManagerModal({ isOpen, onClose }: StorageManagerM
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  const handleDeleteCache = async (e: React.MouseEvent, fileId: string) => {
+  const handleDeleteItem = async (e: React.MouseEvent, fileId: string) => {
     e.stopPropagation();
-    if (confirm("이 파일의 캐시(PDF 데이터)를 기기에서 삭제하시겠습니까?\n작성한 메모와 책갈피는 유지됩니다.")) {
+    if (confirm("이 항목의 데이터(캐시 및 모든 메모/책갈피)를 삭제하시겠습니까?")) {
       await deletePdfCache(fileId);
+      await db.pdfMetadata.where({ fileId }).delete();
+      if (session?.user?.id) {
+        await supabase.from("pdf_metadata").delete().eq("file_id", fileId).eq("user_id", session.user.id);
+      }
       await loadStats();
     }
   };
 
   const handleClearAll = async () => {
-    if (confirm("모든 파일의 캐시를 삭제하시겠습니까?\n작성한 메모와 책갈피는 안전하게 유지됩니다.")) {
+    if (confirm("로컬의 저장된 pdf 이북과 메타데이터는 모두 삭제됩니다. 진행하시겠습니까?")) {
       await clearAllPdfCaches();
+      await db.pdfMetadata.clear();
+      if (session?.user?.id) {
+        await supabase.from("pdf_metadata").delete().eq("user_id", session.user.id);
+      }
       await loadStats();
     }
   };
@@ -66,25 +78,22 @@ export default function StorageManagerModal({ isOpen, onClose }: StorageManagerM
           <h2 className="text-headline-sm text-on-surface flex items-center gap-2">
             <Library className="text-primary" size={24} />
             내 서재
+            <span className="text-ui-label-sm text-on-surface-variant font-normal ml-2 hidden sm:inline">로컬에 저장된 데이터를 관리</span>
           </h2>
-          <button onClick={onClose} className="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-variant rounded-full transition-colors">
-            <X size={24} />
-          </button>
-        </div>
-
-        {/* Toolbar */}
-        <div className="bg-surface-container-lowest px-6 py-4 border-b border-outline-variant flex justify-between items-center shrink-0">
-          <p className="text-ui-label-sm text-on-surface-variant">
-            로컬에 저장된 이북을 확인하고 다시 엽니다.
-          </p>
-          <button
-            onClick={handleClearAll}
-            disabled={stats.every(s => !s.isCached)}
-            className="flex items-center gap-2 text-ui-label-bold text-error hover:bg-error/10 px-4 py-2 rounded transition-colors border border-error/20 disabled:opacity-30"
-          >
-            <Trash2 size={16} />
-            전체 캐시 비우기
-          </button>
+          <div className="flex items-center gap-2 sm:gap-4">
+            <button
+              onClick={handleClearAll}
+              disabled={stats.length === 0}
+              className="flex items-center gap-1 sm:gap-2 text-ui-label-bold text-error hover:bg-error/10 px-3 py-1.5 sm:px-4 sm:py-2 rounded transition-colors border border-error/20 disabled:opacity-30"
+            >
+              <Trash2 size={16} />
+              <span className="hidden sm:inline">전체 삭제</span>
+              <span className="sm:hidden">전체</span>
+            </button>
+            <button onClick={onClose} className="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-variant rounded-full transition-colors">
+              <X size={24} />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
@@ -108,7 +117,7 @@ export default function StorageManagerModal({ isOpen, onClose }: StorageManagerM
                   
                   {/* Info Section */}
                   <div className="flex items-start gap-4 flex-1 min-w-0">
-                    <div className={`p-3 rounded-lg flex-shrink-0 ${stat.isCached ? 'bg-primary-container text-on-primary-container' : 'bg-surface-variant text-on-surface-variant'}`}>
+                    <div className={`hidden sm:flex p-3 rounded-lg flex-shrink-0 ${stat.isCached ? 'bg-primary-container text-on-primary-container' : 'bg-surface-variant text-on-surface-variant'}`}>
                       <FileText size={24} />
                     </div>
                     
@@ -147,20 +156,14 @@ export default function StorageManagerModal({ isOpen, onClose }: StorageManagerM
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center justify-end z-10">
-                    {stat.isCached ? (
-                      <button
-                        onClick={(e) => handleDeleteCache(e, stat.fileId)}
-                        className="flex items-center gap-1.5 text-ui-label-sm text-error hover:bg-error/10 border border-error/30 px-3 py-1.5 rounded transition-colors whitespace-nowrap"
-                      >
-                        <Trash2 size={14} />
-                        캐시 삭제
-                      </button>
-                    ) : (
-                      <span className="text-ui-label-sm text-on-surface-variant px-3 py-1.5 whitespace-nowrap">
-                        캐시 없음
-                      </span>
-                    )}
+                  <div className="flex items-center justify-end z-10 shrink-0">
+                    <button
+                      onClick={(e) => handleDeleteItem(e, stat.fileId)}
+                      className="flex items-center gap-1.5 text-ui-label-sm text-error hover:bg-error/10 border border-error/30 px-3 py-1.5 rounded transition-colors whitespace-nowrap"
+                    >
+                      <Trash2 size={14} />
+                      삭제
+                    </button>
                   </div>
                 </li>
               ))}

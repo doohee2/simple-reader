@@ -13,6 +13,7 @@ export interface PdfCache {
 export interface PdfMetadata {
   id: string;
   fileId: string;
+  fileName?: string;
   page: number;
   type: 'bookmark' | 'memo';
   selectedText: string;
@@ -78,6 +79,10 @@ export async function getStorageStats(): Promise<StorageStat[]> {
     }
 
     const stat = statsMap.get(meta.fileId)!;
+    if (!stat.fileName && meta.fileName) {
+      stat.fileName = meta.fileName;
+    }
+    
     if (meta.type === 'memo') stat.memoCount++;
     if (meta.type === 'bookmark') stat.bookmarkCount++;
     

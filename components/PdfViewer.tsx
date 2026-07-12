@@ -11,6 +11,7 @@ import { usePdfFile } from "@/hooks/usePdfFile";
 import { useMetadataSync } from "@/hooks/useMetadataSync";
 import db from "@/lib/db";
 import DownloadProgressModal from "./DownloadProgressModal";
+import { EMPTY_STATE_MESSAGE } from "@/lib/constants";
 
 const LazyPage = React.memo(({ 
   pageNumber, 
@@ -290,8 +291,8 @@ export default function PdfViewer() {
 
   if (!selectedFileId) {
     return (
-      <section className="flex-1 flex items-center justify-center bg-surface-container-lowest h-full text-on-surface-variant">
-        상단 &apos;드라이브 파일 열기&apos;를 통해 PDF를 선택해 주세요.
+      <section className="flex-1 flex items-center justify-center bg-surface-container-lowest h-full text-on-surface-variant p-4 text-center">
+        {EMPTY_STATE_MESSAGE}
       </section>
     );
   }

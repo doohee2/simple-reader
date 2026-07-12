@@ -61,6 +61,7 @@ describe('PdfViewer Integration', () => {
 
     (usePdfFile as jest.Mock).mockReturnValue({
       fileData: new ArrayBuffer(8),
+      downloadState: 'success',
       isLoading: false,
       error: null,
     });

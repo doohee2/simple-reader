@@ -3,6 +3,7 @@ import db, { PdfMetadata } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
 import { useLiveQuery } from "dexie-react-hooks";
+import { useStore } from "@/store/useStore";
 
 export function useMetadataSync(fileId: string | null) {
   const { data: session } = useSession();
@@ -130,9 +131,12 @@ export function useMetadataSync(fileId: string | null) {
       return;
     }
 
+    const { selectedFileName } = useStore.getState();
+
     const newMeta: PdfMetadata = {
       id: crypto.randomUUID(), // 고유 ID
       fileId,
+      fileName: selectedFileName || undefined,
       page,
       type,
       selectedText,

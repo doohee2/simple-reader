@@ -20,6 +20,7 @@ export function usePdfFile(fileId: string | null) {
   useEffect(() => {
     isMountedRef.current = true;
     if (!fileId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFileData(null);
       setDownloadState('idle');
       setTotalBytes(0);
@@ -147,8 +148,8 @@ export function usePdfFile(fileId: string | null) {
       if (arrayBuffer) {
         await saveToCacheAndSet(arrayBuffer);
       }
-    } catch (err: any) {
-      if (err.name === 'AbortError') return;
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return;
       console.error("Direct download error:", err);
       if (isMountedRef.current) {
         setError("직접 다운로드에 실패했습니다. (CORS, 만료된 토큰 또는 권한 문제일 수 있습니다)");
@@ -180,8 +181,8 @@ export function usePdfFile(fileId: string | null) {
       if (arrayBuffer) {
         await saveToCacheAndSet(arrayBuffer);
       }
-    } catch (err: any) {
-      if (err.name === 'AbortError') return;
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return;
       console.error("Proxy download error:", err);
       if (isMountedRef.current) {
         setError(err instanceof Error ? err.message : "다운로드 중 오류가 발생했습니다.");
