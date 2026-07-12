@@ -70,7 +70,7 @@ const LazyPage = React.memo(({
   const expectedHeight = expectedWidth * 1.414;
 
   return (
-    <div id={`page-${pageNumber}`} ref={ref} className="mb-4 flex justify-center min-h-[600px] w-full relative">
+    <div id={`page-${pageNumber}`} ref={ref} className={`mb-4 flex ${zoomMode === "fit" ? "justify-center" : "justify-start"} min-h-[600px] w-full relative`}>
       {isRendered ? (
         <div className="shadow-xl bg-white transition-transform origin-top">
           <Page
@@ -342,12 +342,15 @@ export default function PdfViewer() {
     );
   }
 
+  const fitScale = (containerWidth && pageBaseWidth) ? (containerWidth - 32) / pageBaseWidth : 1;
+  const currentScale = zoomMode === "fit" ? fitScale : customScale;
+
   return (
     <TransformWrapper
       ref={transformRef}
       initialScale={1}
-      minScale={0.25}
-      maxScale={8}
+      minScale={0.25 / currentScale}
+      maxScale={8.0 / currentScale}
       panning={{ 
         disabled: true, 
       }}
@@ -361,8 +364,6 @@ export default function PdfViewer() {
           const scrollY = el ? el.scrollTop : 0;
           const scrollX = el ? el.scrollLeft : 0;
           
-          const fitScale = (containerWidth && pageBaseWidth) ? (containerWidth - 32) / pageBaseWidth : 1;
-          const currentScale = zoomMode === "fit" ? fitScale : customScale;
           const newScale = Math.min(Math.max(0.25, currentScale * cssScale), 8.0);
           
           const wasFit = zoomMode === "fit";
@@ -388,8 +389,6 @@ export default function PdfViewer() {
           const scrollY = el ? el.scrollTop : 0;
           const scrollX = el ? el.scrollLeft : 0;
           
-          const fitScale = (containerWidth && pageBaseWidth) ? (containerWidth - 32) / pageBaseWidth : 1;
-          const currentScale = zoomMode === "fit" ? fitScale : customScale;
           const newScale = Math.min(Math.max(0.25, currentScale * cssScale), 8.0);
           
           setZoomMode("custom");
@@ -407,7 +406,6 @@ export default function PdfViewer() {
       }}
     >
       {({ state }) => {
-        const fitScale = (containerWidth && pageBaseWidth) ? (containerWidth - 32) / pageBaseWidth : 1;
         const displayedScale = zoomMode === "fit" ? fitScale : customScale;
         
         const handleZoomIn = () => {
