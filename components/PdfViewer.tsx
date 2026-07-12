@@ -372,7 +372,9 @@ export default function PdfViewer() {
       }}
       onZoomStop={(ref) => {
         const cssScale = ref.state.scale;
-        if (Math.abs(cssScale - 1) > 0.01) {
+        const posX = ref.state.positionX;
+        const posY = ref.state.positionY;
+        if (Math.abs(cssScale - 1) > 0.001 || Math.abs(posX) > 0 || Math.abs(posY) > 0) {
           const el = containerRef.current;
           const scrollY = el ? el.scrollTop : 0;
           const scrollX = el ? el.scrollLeft : 0;
@@ -380,24 +382,33 @@ export default function PdfViewer() {
           const newScale = Math.min(Math.max(0.25, currentScale * cssScale), 8.0);
           
           const wasFit = zoomMode === "fit";
-          setZoomMode("custom");
-          setCustomScale(newScale);
-          
-          // CSS scale이 해제되고 Canvas의 Intrinsic 크기가 커질 때 시각적 위치를 유지하기 위한 스크롤 계산
-          // Fit 모드에서 Custom 모드로 전환 시, flexbox center가 해제되면서 16px 왼쪽 여백이 사라집니다. 이를 보정합니다.
           const xOffset = wasFit ? (16 * cssScale) : 0;
           
-          pendingScrollRef.current = {
-            x: scrollX - ref.state.positionX - xOffset,
-            y: scrollY - ref.state.positionY
-          };
-          
-          pendingResetTransformRef.current = true;
+          if (newScale === customScale && zoomMode === "custom") {
+            // No React render needed, reset instantly to prevent bounce animation
+            transformRef.current?.resetTransform(0);
+            if (el) {
+              el.scrollLeft = scrollX - posX - xOffset;
+              el.scrollTop = scrollY - posY;
+            }
+          } else {
+            setZoomMode("custom");
+            setCustomScale(newScale);
+            
+            pendingScrollRef.current = {
+              x: scrollX - posX - xOffset,
+              y: scrollY - posY
+            };
+            
+            pendingResetTransformRef.current = true;
+          }
         }
       }}
       onPinchStop={(ref) => {
         const cssScale = ref.state.scale;
-        if (Math.abs(cssScale - 1) > 0.01) {
+        const posX = ref.state.positionX;
+        const posY = ref.state.positionY;
+        if (Math.abs(cssScale - 1) > 0.001 || Math.abs(posX) > 0 || Math.abs(posY) > 0) {
           const el = containerRef.current;
           const scrollY = el ? el.scrollTop : 0;
           const scrollX = el ? el.scrollLeft : 0;
@@ -405,17 +416,25 @@ export default function PdfViewer() {
           const newScale = Math.min(Math.max(0.25, currentScale * cssScale), 8.0);
           
           const wasFit = zoomMode === "fit";
-          setZoomMode("custom");
-          setCustomScale(newScale);
-          
           const xOffset = wasFit ? (16 * cssScale) : 0;
           
-          pendingScrollRef.current = {
-            x: scrollX - ref.state.positionX - xOffset,
-            y: scrollY - ref.state.positionY
-          };
-          
-          pendingResetTransformRef.current = true;
+          if (newScale === customScale && zoomMode === "custom") {
+            transformRef.current?.resetTransform(0);
+            if (el) {
+              el.scrollLeft = scrollX - posX - xOffset;
+              el.scrollTop = scrollY - posY;
+            }
+          } else {
+            setZoomMode("custom");
+            setCustomScale(newScale);
+            
+            pendingScrollRef.current = {
+              x: scrollX - posX - xOffset,
+              y: scrollY - posY
+            };
+            
+            pendingResetTransformRef.current = true;
+          }
         }
       }}
     >
@@ -528,7 +547,7 @@ export default function PdfViewer() {
                   <span className="material-symbols-outlined text-[18px]">remove</span>
                 </button>
                 <span ref={scaleDisplayRef} className="text-ui-label-sm text-on-surface w-10 text-center whitespace-nowrap">
-                  {Math.round(displayedScale * state.scale * 100)}%
+                  {Math.round(displayedScale * (pendingResetTransformRef.current ? 1 : state.scale) * 100)}%
                 </span>
                 <button 
                   onClick={handleZoomIn} 
