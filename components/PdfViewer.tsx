@@ -130,9 +130,14 @@ export default function PdfViewer() {
   
   const ignoreIntersectRef = useRef(false);
   const pendingScrollRef = useRef<{ x: number; y: number } | null>(null);
+  const pendingResetTransformRef = useRef(false);
   const scaleDisplayRef = useRef<HTMLSpanElement>(null);
 
   useLayoutEffect(() => {
+    if (pendingResetTransformRef.current) {
+      transformRef.current?.resetTransform(0);
+      pendingResetTransformRef.current = false;
+    }
     if (pendingScrollRef.current && containerRef.current) {
       containerRef.current.scrollLeft = pendingScrollRef.current.x;
       containerRef.current.scrollTop = pendingScrollRef.current.y;
@@ -358,9 +363,9 @@ export default function PdfViewer() {
       wheel={{ wheelDisabled: true }} // Disable wheel zoom to allow native vertical scroll
       pinch={{ step: 5 }}
       doubleClick={{ disabled: true }}
-      onTransformed={(ref) => {
+      onTransform={(ref, state) => {
         if (scaleDisplayRef.current) {
-          const perceived = currentScale * ref.state.scale;
+          const perceived = currentScale * state.scale;
           const bounded = Math.min(Math.max(0.25, perceived), 8.0);
           scaleDisplayRef.current.innerText = `${Math.round(bounded * 100)}%`;
         }
@@ -387,7 +392,7 @@ export default function PdfViewer() {
             y: scrollY - ref.state.positionY
           };
           
-          ref.resetTransform(0);
+          pendingResetTransformRef.current = true;
         }
       }}
       onPinchStop={(ref) => {
@@ -399,17 +404,18 @@ export default function PdfViewer() {
           
           const newScale = Math.min(Math.max(0.25, currentScale * cssScale), 8.0);
           
+          const wasFit = zoomMode === "fit";
           setZoomMode("custom");
           setCustomScale(newScale);
           
-          const ratio = newScale / currentScale;
-          requestAnimationFrame(() => {
-            if (el) {
-              el.scrollTop = scrollY * ratio;
-              el.scrollLeft = scrollX * ratio;
-            }
-          });
-          ref.resetTransform(0);
+          const xOffset = wasFit ? (16 * cssScale) : 0;
+          
+          pendingScrollRef.current = {
+            x: scrollX - ref.state.positionX - xOffset,
+            y: scrollY - ref.state.positionY
+          };
+          
+          pendingResetTransformRef.current = true;
         }
       }}
     >
@@ -418,15 +424,29 @@ export default function PdfViewer() {
         
         const handleZoomIn = () => {
           const perceived = displayedScale * state.scale;
+          const currentPct = perceived * 100;
+          let step = 5;
+          if (currentPct >= 200) step = 20;
+          else if (currentPct >= 130) step = 10;
+          
+          let nextPct = Math.ceil((currentPct + 1) / step) * step;
+          
           setZoomMode("custom");
-          setCustomScale(Math.min(Math.ceil((perceived * 100 + 1) / 5) * 5 / 100, 8.0));
+          setCustomScale(Math.min(nextPct / 100, 8.0));
           transformRef.current?.resetTransform(0);
         };
 
         const handleZoomOut = () => {
           const perceived = displayedScale * state.scale;
+          const currentPct = perceived * 100;
+          let step = 5;
+          if (currentPct > 200) step = 20;
+          else if (currentPct > 130) step = 10;
+          
+          let nextPct = Math.floor((currentPct - 1) / step) * step;
+          
           setZoomMode("custom");
-          setCustomScale(Math.max(Math.floor((perceived * 100 - 1) / 5) * 5 / 100, 0.25));
+          setCustomScale(Math.max(nextPct / 100, 0.25));
           transformRef.current?.resetTransform(0);
         };
 
