@@ -19,6 +19,7 @@ export interface PdfMetadata {
   selectedText: string;
   content: string;
   updatedAt: string;
+  deletedAt?: string;
 }
 
 const db = new Dexie('SimpleReaderDB') as Dexie & {
@@ -27,11 +28,12 @@ const db = new Dexie('SimpleReaderDB') as Dexie & {
 };
 
 // 스키마 선언
-db.version(2).stores({
+db.version(3).stores({
   pdfCache: 'fileId', // Primary key is fileId
   pdfMetadata: 'id, fileId, type', // Primary key is id, indexed by fileId and type
 }).upgrade(tx => {
-  // Add fileName field to pdfCache in v2, but it's not indexed so no schema change needed in stores string
+  // Version 2: Add fileName field to pdfCache
+  // Version 3: Add deletedAt field to pdfMetadata (not indexed, so no stores string change)
 });
 
 export default db;

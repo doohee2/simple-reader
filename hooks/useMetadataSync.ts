@@ -14,9 +14,10 @@ export function useMetadataSync(fileId: string | null) {
     async () => {
       if (!fileId) return [];
       const localData = await db.pdfMetadata.where("fileId").equals(fileId).toArray();
-      // 최신순 정렬
-      localData.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-      return localData;
+      // Soft Delete(삭제됨) 항목 필터링 및 최신순 정렬
+      const activeData = localData.filter(item => !item.deletedAt);
+      activeData.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      return activeData;
     },
     [fileId],
     []
@@ -26,8 +27,39 @@ export function useMetadataSync(fileId: string | null) {
   useEffect(() => {
     if (!fileId || !userId) return;
 
+    let isSyncing = false;
+
     async function syncWithServer() {
+      if (isSyncing) return;
+      isSyncing = true;
+
       try {
+        // 0. 30일 초과된 Soft Delete 항목 영구 삭제 (서버 및 로컬)
+        try {
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          const thresholdISO = thirtyDaysAgo.toISOString();
+
+          // 로컬 Dexie 정리 (현재 파일 기준)
+          const oldLocalItems = await db.pdfMetadata
+            .where("fileId").equals(fileId as string)
+            .filter(item => !!item.deletedAt && item.deletedAt < thresholdISO)
+            .primaryKeys();
+          
+          if (oldLocalItems.length > 0) {
+            await db.pdfMetadata.bulkDelete(oldLocalItems);
+          }
+
+          // 서버 Supabase 정리 (현재 접속한 유저의 모든 오래된 삭제 기록 정리)
+          await supabase.from("pdf_metadata")
+            .delete()
+            .eq("user_id", userId as string)
+            .not("deleted_at", "is", null)
+            .lt("deleted_at", thresholdISO);
+        } catch (cleanupErr) {
+          console.error("오래된 삭제 데이터 영구 삭제 실패:", cleanupErr);
+        }
+
         // 1. 서버 데이터와 로컬 데이터 각각 가져오기
         const [ { data: serverData, error }, localData ] = await Promise.all([
           supabase.from("pdf_metadata").select("*").eq("file_id", fileId as string).eq("user_id", userId as string),
@@ -67,7 +99,8 @@ export function useMetadataSync(fileId: string | null) {
                 type: serverItem.type,
                 selectedText: serverItem.selected_text,
                 content: serverItem.content,
-                updatedAt: serverItem.updated_at
+                updatedAt: serverItem.updated_at,
+                deletedAt: serverItem.deleted_at || undefined
               });
             }
           }
@@ -84,7 +117,8 @@ export function useMetadataSync(fileId: string | null) {
               type: serverItem.type,
               selectedText: serverItem.selected_text,
               content: serverItem.content,
-              updatedAt: serverItem.updated_at
+              updatedAt: serverItem.updated_at,
+              deletedAt: serverItem.deleted_at || undefined
             });
           }
         });
@@ -103,7 +137,8 @@ export function useMetadataSync(fileId: string | null) {
             type: item.type,
             selected_text: item.selectedText,
             content: item.content,
-            updated_at: item.updatedAt
+            updated_at: item.updatedAt,
+            deleted_at: item.deletedAt || null
           }));
           const { error: upsertError } = await supabase.from("pdf_metadata").upsert(upsertData);
           if (upsertError) {
@@ -113,10 +148,20 @@ export function useMetadataSync(fileId: string | null) {
 
       } catch (err) {
         console.error("Supabase 동기화 실패 (오프라인 모드 유지):", err);
+      } finally {
+        isSyncing = false;
       }
     }
 
+    // 1. 초기 1회 실행
     syncWithServer();
+
+    // 2. 10분(600,000ms) 주기 정기 폴링
+    const intervalId = setInterval(syncWithServer, 600000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
   }, [fileId, userId]);
 
   // 3. 새로운 메타데이터 저장 (로컬 저장 후 백그라운드 동기화)
@@ -190,16 +235,25 @@ export function useMetadataSync(fileId: string | null) {
     }
   };
 
-  // 5. 메타데이터 삭제
+  // 5. 메타데이터 삭제 (Soft Delete)
   const deleteMetadata = async (id: string) => {
     if (!userId) return;
     
-    // 로컬 즉시 삭제
-    await db.pdfMetadata.delete(id);
+    const now = new Date().toISOString();
 
-    // 백그라운드 서버 동기화
+    // 로컬 Soft Delete 처리 (실제 삭제 대신 deletedAt 기록)
+    const item = await db.pdfMetadata.get(id);
+    if (item) {
+      item.deletedAt = now;
+      item.updatedAt = now;
+      await db.pdfMetadata.put(item);
+    }
+
+    // 백그라운드 서버 동기화 (업데이트)
     try {
-      await supabase.from("pdf_metadata").delete().eq("id", id).eq("user_id", userId);
+      await supabase.from("pdf_metadata")
+        .update({ deleted_at: now, updated_at: now })
+        .eq("id", id).eq("user_id", userId);
     } catch (err) {
       console.error("Supabase 삭제 동기화 실패:", err);
     }
