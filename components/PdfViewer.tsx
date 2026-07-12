@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef, useCallback, useLayoutEffect } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -129,6 +129,15 @@ export default function PdfViewer() {
   const transformRef = useRef<any>(null);
   
   const ignoreIntersectRef = useRef(false);
+  const pendingScrollRef = useRef<{ x: number; y: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (pendingScrollRef.current && containerRef.current) {
+      containerRef.current.scrollLeft = pendingScrollRef.current.x;
+      containerRef.current.scrollTop = pendingScrollRef.current.y;
+      pendingScrollRef.current = null;
+    }
+  }, [customScale, zoomMode]);
 
   const scrollToPage = useCallback((p: number, isContinuous: boolean, delay = 0) => {
     if (!isContinuous) return;
@@ -359,13 +368,11 @@ export default function PdfViewer() {
           setZoomMode("custom");
           setCustomScale(newScale);
           
-          const ratio = newScale / currentScale;
-          requestAnimationFrame(() => {
-            if (el) {
-              el.scrollTop = scrollY * ratio;
-              el.scrollLeft = scrollX * ratio;
-            }
-          });
+          pendingScrollRef.current = {
+            x: scrollX - ref.state.positionX,
+            y: scrollY - ref.state.positionY
+          };
+          
           ref.resetTransform(0);
         }
       }}
