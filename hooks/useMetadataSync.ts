@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import db, { PdfMetadata } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
@@ -25,9 +25,11 @@ export function useMetadataSync(fileId: string | null) {
   );
 
   const [isSyncing, setIsSyncing] = useState(false);
+  const isSyncingRef = useRef(false);
 
   const manualSync = useCallback(async () => {
-    if (!fileId || !userId || isSyncing) return;
+    if (!fileId || !userId || isSyncingRef.current) return;
+    isSyncingRef.current = true;
     setIsSyncing(true);
 
     try {
@@ -146,9 +148,10 @@ export function useMetadataSync(fileId: string | null) {
       } catch (err) {
         console.error("Supabase 동기화 실패 (오프라인 모드 유지):", err);
       } finally {
+        isSyncingRef.current = false;
         setIsSyncing(false);
       }
-  }, [fileId, userId, isSyncing]);
+  }, [fileId, userId]);
 
   // 2. 백엔드(Supabase) 동기화 스케줄링
   useEffect(() => {
