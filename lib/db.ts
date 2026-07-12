@@ -70,6 +70,8 @@ export async function getStorageStats(): Promise<StorageStat[]> {
   // 2. Process pdfMetadata
   const metadatas = await db.pdfMetadata.toArray();
   for (const meta of metadatas) {
+    if (meta.deletedAt) continue;
+
     if (!statsMap.has(meta.fileId)) {
       statsMap.set(meta.fileId, {
         fileId: meta.fileId,

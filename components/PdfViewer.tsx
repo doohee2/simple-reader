@@ -229,9 +229,35 @@ export default function PdfViewer() {
     }
   };
 
-  // 배경 클릭 시 선택 영역 해제
-  const handleBackgroundClick = (e: React.MouseEvent) => {
-    // 텍스트 영역 밖을 클릭했다고 판단될 때만 클린업
+  // 컨테이너 클릭 (텍스트 선택 해제 및 좌우 엣지 탭 네비게이션)
+  const handleContainerClick = (e: React.MouseEvent) => {
+    // 1. 텍스트가 선택되어 있는 상태라면 네비게이션 무시
+    const selection = window.getSelection();
+    if (selection && selection.toString().trim().length > 0) {
+      // 텍스트 바깥 영역 클릭 시에만 선택 해제
+      if (e.target === e.currentTarget) {
+        handleCleanupSelection();
+      }
+      return;
+    }
+
+    // 2. 단일 페이지 모드일 때 좌/우 엣지 클릭 네비게이션
+    if (viewMode === "single" && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const width = rect.width;
+      
+      // 왼쪽 20% 클릭 시 이전 페이지, 오른쪽 20% 클릭 시 다음 페이지
+      if (clickX < width * 0.2) {
+        if (pageNumber > 1) previousPage();
+        return; // 네비게이션 수행 후 종료
+      } else if (clickX > width * 0.8) {
+        if (pageNumber < numPages) nextPage();
+        return; // 네비게이션 수행 후 종료
+      }
+    }
+
+    // 3. 그 외 빈 배경 영역 클릭 시 클린업
     if (e.target === e.currentTarget) {
       handleCleanupSelection();
     }
@@ -490,7 +516,7 @@ export default function PdfViewer() {
       <div 
         ref={containerRef}
         className={`flex-1 p-4 bg-surface-dim relative ${zoomMode === "fit" ? "overflow-y-auto overflow-x-hidden" : "overflow-auto"}`}
-        onClick={handleBackgroundClick}
+        onClick={handleContainerClick}
         onMouseUp={handleMouseUp}
       >
         {tooltipPos && (
