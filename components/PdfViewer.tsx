@@ -346,8 +346,8 @@ export default function PdfViewer() {
     <TransformWrapper
       ref={transformRef}
       initialScale={1}
-      minScale={0.5}
-      maxScale={4}
+      minScale={0.25}
+      maxScale={8}
       panning={{ 
         disabled: true, 
       }}
@@ -363,7 +363,7 @@ export default function PdfViewer() {
           
           const fitScale = (containerWidth && pageBaseWidth) ? (containerWidth - 32) / pageBaseWidth : 1;
           const currentScale = zoomMode === "fit" ? fitScale : customScale;
-          const newScale = Math.min(Math.max(0.5, currentScale * cssScale), 4.0);
+          const newScale = Math.min(Math.max(0.25, currentScale * cssScale), 8.0);
           
           const wasFit = zoomMode === "fit";
           setZoomMode("custom");
@@ -390,7 +390,7 @@ export default function PdfViewer() {
           
           const fitScale = (containerWidth && pageBaseWidth) ? (containerWidth - 32) / pageBaseWidth : 1;
           const currentScale = zoomMode === "fit" ? fitScale : customScale;
-          const newScale = Math.min(Math.max(0.5, currentScale * cssScale), 4.0);
+          const newScale = Math.min(Math.max(0.25, currentScale * cssScale), 8.0);
           
           setZoomMode("custom");
           setCustomScale(newScale);
@@ -413,14 +413,14 @@ export default function PdfViewer() {
         const handleZoomIn = () => {
           const perceived = displayedScale * state.scale;
           setZoomMode("custom");
-          setCustomScale(Math.min(Math.ceil((perceived * 100 + 1) / 5) * 5 / 100, 4.0));
+          setCustomScale(Math.min(Math.ceil((perceived * 100 + 1) / 5) * 5 / 100, 8.0));
           transformRef.current?.resetTransform(0);
         };
 
         const handleZoomOut = () => {
           const perceived = displayedScale * state.scale;
           setZoomMode("custom");
-          setCustomScale(Math.max(Math.floor((perceived * 100 - 1) / 5) * 5 / 100, 0.5));
+          setCustomScale(Math.max(Math.floor((perceived * 100 - 1) / 5) * 5 / 100, 0.25));
           transformRef.current?.resetTransform(0);
         };
 
