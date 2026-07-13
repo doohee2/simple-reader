@@ -134,6 +134,8 @@ export default function PdfViewer() {
   
   const pdfWrapperRef = useRef<HTMLDivElement>(null);
   const [isQuickZoomed, setIsQuickZoomed] = useState(false);
+  const [pinchSpikeThreshold, setPinchSpikeThreshold] = useState<number>(10);
+  const [showThresholdModal, setShowThresholdModal] = useState(false);
   const quickZoomOriginalRef = useRef<{ scale: number; zoomMode: "fit" | "custom" } | null>(null);
   const lastClickRef = useRef<{ time: number; x: number; y: number } | null>(null);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -573,6 +575,16 @@ export default function PdfViewer() {
       }}
       onPinch={(ref) => {
         // onPinch는 반드시 touches.length > 1 일 때만 호출됨 (라이브러리 소스 확인)
+        const lastGood = lastGoodPinchStateRef.current;
+        if (lastGood && pinchSpikeThreshold > 0) {
+          const diff = Math.abs(ref.state.scale - lastGood.scale);
+          // threshold가 10이면 10% (0.1)
+          if (diff > lastGood.scale * (pinchSpikeThreshold / 100)) {
+            // 튄 값 무시 (Drop frame)
+            return;
+          }
+        }
+        
         // 따라서 여기서 저장하는 state는 항상 2손가락 기준의 정상 값
         lastGoodPinchStateRef.current = {
           scale: ref.state.scale,
@@ -708,7 +720,12 @@ export default function PdfViewer() {
                 >
                   <span className="material-symbols-outlined text-[18px]">remove</span>
                 </button>
-                <span ref={scaleDisplayRef} className="text-ui-label-sm text-on-surface w-10 text-center whitespace-nowrap">
+                <span 
+                  ref={scaleDisplayRef} 
+                  onClick={() => setShowThresholdModal(true)}
+                  className="text-ui-label-sm text-on-surface w-10 text-center whitespace-nowrap cursor-pointer hover:bg-surface-variant rounded transition-colors"
+                  title="핀치 줌 보정 수치 설정"
+                >
                 </span>
                 <button 
                   onClick={handleZoomIn} 
@@ -856,6 +873,41 @@ export default function PdfViewer() {
           </TransformComponent>
         )}
         </div>
+        {/* 핀치 줌 보정 수치 모달 */}
+        {showThresholdModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="bg-surface-container rounded-xl p-6 w-80 shadow-xl border border-outline-variant">
+              <h3 className="text-ui-title-md text-on-surface mb-2">핀치 줌 보정 수치</h3>
+              <p className="text-ui-body-sm text-on-surface-variant mb-4">
+                값이 작을수록 줌이 튀는 현상에 민감하게 반응하여 무시합니다. (기본값: 10%)
+              </p>
+              <div className="flex items-center gap-3 mb-6">
+                <input 
+                  type="range" 
+                  min="1" max="50" step="1"
+                  value={pinchSpikeThreshold}
+                  onChange={(e) => setPinchSpikeThreshold(Number(e.target.value))}
+                  className="flex-1 accent-primary"
+                />
+                <span className="text-ui-label-md text-primary w-8 text-right">{pinchSpikeThreshold}%</span>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button 
+                  onClick={() => setPinchSpikeThreshold(10)}
+                  className="px-4 py-2 text-ui-label-md text-on-surface-variant hover:bg-surface-variant rounded-lg transition-colors"
+                >
+                  초기화
+                </button>
+                <button 
+                  onClick={() => setShowThresholdModal(false)}
+                  className="px-4 py-2 text-ui-label-md text-on-primary bg-primary rounded-lg shadow-sm hover:bg-primary-hover transition-colors"
+                >
+                  확인
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
     )}}
     </TransformWrapper>
