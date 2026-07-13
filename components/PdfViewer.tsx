@@ -138,6 +138,7 @@ export default function PdfViewer() {
   const lastClickRef = useRef<{ time: number; x: number; y: number } | null>(null);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pinchCenterRef = useRef<{ x: number; y: number } | null>(null);
+  const activePointersRef = useRef<Set<number>>(new Set());
   
   const stateRef = useRef<{ currentScale: number; zoomMode: "fit" | "custom"; customScale: number; fitScale: number }>({ currentScale: 1, zoomMode: "fit", customScale: 1, fitScale: 1 });
 
@@ -777,6 +778,24 @@ export default function PdfViewer() {
               onTouchStart={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
               onTouchMove={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
               onTouchEnd={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
+              onPointerDownCapture={(e) => {
+                activePointersRef.current.add(e.pointerId);
+              }}
+              onPointerUpCapture={(e) => {
+                if (activePointersRef.current.size >= 2) {
+                  activePointersRef.current.delete(e.pointerId);
+                  if (activePointersRef.current.size === 1) {
+                    // 핀치 중 한 손가락이 떨어지면, 라이브러리가 폭주하기 전에 즉시 강제 취소 이벤트를 발송하여 줌을 안전하게 종료
+                    e.target.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true }));
+                    e.stopPropagation();
+                  }
+                } else {
+                  activePointersRef.current.delete(e.pointerId);
+                }
+              }}
+              onPointerCancelCapture={(e) => {
+                activePointersRef.current.delete(e.pointerId);
+              }}
               className="w-full flex flex-col items-start p-4"
             >
               <Document
