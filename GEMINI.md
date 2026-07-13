@@ -120,13 +120,11 @@ simple-reader/
    - Flexbox의 `align-items: center` 적용 시, 문서가 뷰포트보다 커지면 화면 좌측 영역으로 오버플로우된 부분이 잘려 스크롤로 접근할 수 없는 고질적 문제가 발생합니다.
    - 이를 해결하기 위해 모든 상위 래퍼 컨테이너는 항상 `items-start`(왼쪽 정렬)로 통일하고, 단일 및 연속 페이지 내부 래퍼(`LazyPage`)에 **`mx-auto w-max`** 클래스를 적용했습니다. 문서가 뷰포트보다 작을 때는 `margin: auto`를 통해 완벽히 중앙에 배치되고, 화면을 넘어갈 경우 자동으로 왼쪽 벽을 기준으로 자연스럽게 팽창하여 양방향 스크롤을 100% 지원합니다.
 
-4. **1손가락 터치 완벽 분리 및 핀치 줌 종료 폭주 방어 (현재 구현 상태 및 한계점)**
-   - **현재 구현 방식 (Pointer Event Trap):** 
-     줌 라이브러리가 1손가락 터치 이벤트를 가로채어 세로 스크롤을 막는 것을 방지하기 위해 최상단에 `onTouchStart`/`onTouchMove`/`onTouchEnd` 이벤트 리스너를 달아, 손가락 1개(`e.touches.length === 1`)의 이벤트는 `e.stopPropagation()`으로 차단합니다.
-     추가로, 핀치 줌 중 한 손가락이 먼저 떨어질 때 라이브러리가 오계산하여 줌 수치가 폭주(Focal Point Snapping)하는 버그를 막기 위해 `onPointer...Capture` 이벤트를 부착했습니다. `activePointersRef`로 포인터 수를 추적하다가 2개에서 1개로 줄어드는 순간 강제로 `pointercancel` 이벤트를 발생시키고 원래의 `pointerup`을 차단하도록 설계되었습니다.
-   - **⚠️ 개선 필요사항 (TODO):**
-     현재의 포인터 캡처 및 이벤트 차단 방식(`pointercancel` 발송 등)으로는 최신 모바일 브라우저 환경에서 라이브러리(`react-zoom-pan-pinch`) 내부 깊숙이 바인딩된 네이티브 이벤트나 초점 재계산 로직을 완벽하게 통제하지 못하고 있습니다. 여전히 두 손가락이 시간차를 두고 떨어질 때 앵커가 튀거나 엉뚱한 페이지로 튕기는 현상이 잔존해 있습니다.
-     **향후 개선 방향:** 이벤트를 겉에서 막으려는 시도보다는, `onPinching` 이벤트에서 매 프레임 정상적인 배율/좌표(Scale, X, Y)를 추적(저장)해 두었다가, `onPinchStop`이 발생할 때 튀어버린 가짜 DOM 상태를 무시하고 저장해둔 정상 상태로 수학적 롤백(상태 복원)을 수행한 뒤 앵커(`elementFromPoint`)를 측정하는 정공법으로의 재검토가 필요합니다.
+4. **1손가락 터치 완벽 분리 및 핀치 줌 종료 폭주 방어 (Last Good State 방식)**
+   - **1손가락 스크롤 보호:** 줌 라이브러리가 1손가락 터치 이벤트를 가로채어 세로 스크롤을 막는 것을 방지하기 위해 `pdfWrapperRef`에 `onTouchStart`/`onTouchMove` 이벤트 리스너를 달아, 손가락 1개(`e.touches.length === 1`)의 이벤트는 `e.stopPropagation()`으로 차단합니다.
+   - **핀치 줌 드롭 문제의 근본 원인:** 라이브러리 소스 분석 결과(`index.esm.js:1879-1898`), 핀치 줌(2손가락) 중 한 손가락이 먼저 떨어지는 찰나에 `touchmove`가 `touches.length === 1`로 발생하면, 라이브러리가 이를 **1손가락 패닝으로 오인**하여 남은 손가락 위치로 `handlePanning()`을 실행합니다. 이 순간 라이브러리 내부의 transform 좌표(positionX, positionY)가 급변(Focal Point Snapping)하며, 직후의 `onTouchPanningStop`(`index.esm.js:1900-1903`)에서 `onPinchStop`이 호출될 때 `ref.state`는 이미 오염된 상태입니다.
+   - **해결 방식 (Last Good State):** 라이브러리의 공식 콜백 `onPinch`는 반드시 `event.touches.length > 1`(정상적인 2손가락 핀치) 일 때만 호출됩니다(`index.esm.js:1896`). 따라서 `onPinch` 콜백에서 매 프레임 `ref.state`(scale, positionX, positionY)를 `lastGoodPinchStateRef`에 저장해 둡니다. `onPinchStop` 시점에서는 오염 가능성이 있는 `ref.state`를 무시하고, 저장해둔 마지막 정상 상태의 scale 값을 사용하여 `applyZoomWithAnchor`를 호출합니다.
+   - **이벤트 핸들러 다이어트:** 효과가 없었던 Pointer Event Trap 코드(`onPointerDownCapture`, `onPointerUpCapture`, `onPointerCancelCapture`, `activePointersRef`)는 전량 제거되었습니다. 라이브러리가 Pointer 이벤트를 전혀 사용하지 않고 Touch 이벤트만 사용하기 때문입니다.
 
 5. **모바일 텍스트 드래그 선택 안정화 (selectionchange)**
    - 모바일 환경(롱 프레스 후 핸들 드래그)에서는 `onMouseUp`이나 `onTouchEnd` 이벤트로 텍스트 선택 완료 시점을 정확히 잡을 수 없습니다. 

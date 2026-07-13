@@ -138,7 +138,7 @@ export default function PdfViewer() {
   const lastClickRef = useRef<{ time: number; x: number; y: number } | null>(null);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pinchCenterRef = useRef<{ x: number; y: number } | null>(null);
-  const activePointersRef = useRef<Set<number>>(new Set());
+  const lastGoodPinchStateRef = useRef<{ scale: number; positionX: number; positionY: number } | null>(null);
   
   const stateRef = useRef<{ currentScale: number; zoomMode: "fit" | "custom"; customScale: number; fitScale: number }>({ currentScale: 1, zoomMode: "fit", customScale: 1, fitScale: 1 });
 
@@ -507,22 +507,44 @@ export default function PdfViewer() {
   
   stateRef.current = { currentScale, zoomMode, customScale, fitScale };
 
-  const handleZoomOrPinchStop = (ref: any) => {
+  // 휠/트랙패드 줌 종료 핸들러 (오염 위험 없음, ref.state 직접 사용)
+  const handleZoomStop = (ref: any) => {
     setIsQuickZoomed(false);
     
     const libScale = ref.state.scale;
     const currentScale = stateRef.current.currentScale;
     
-    // 라이브러리의 scale은 항상 1부터 시작하는 상대적 배율
     if (Math.abs(libScale - 1) < 0.05) {
       transformRef.current?.resetTransform(0);
       return;
     }
     
-    // 현재 스케일에 라이브러리 스케일을 그대로 곱함 (왜곡 방지)
+    const targetScale = Math.min(Math.max(currentScale * libScale, 0.25), 8.0);
+    applyZoomWithAnchor(targetScale, "custom");
+  };
+
+  // 핀치 줌 종료 핸들러 (오염된 ref.state 대신 lastGoodPinchStateRef 사용)
+  const handlePinchStop = () => {
+    setIsQuickZoomed(false);
+    
+    const lastGood = lastGoodPinchStateRef.current;
+    lastGoodPinchStateRef.current = null;
+    
+    if (!lastGood) {
+      transformRef.current?.resetTransform(0);
+      return;
+    }
+    
+    const libScale = lastGood.scale;
+    const currentScale = stateRef.current.currentScale;
+    
+    if (Math.abs(libScale - 1) < 0.05) {
+      transformRef.current?.resetTransform(0);
+      return;
+    }
+    
     const targetScale = Math.min(Math.max(currentScale * libScale, 0.25), 8.0);
     
-    // 저장해둔 핀치 중심점 사용 후 초기화
     const anchor = pinchCenterRef.current;
     pinchCenterRef.current = null;
     
@@ -549,8 +571,17 @@ export default function PdfViewer() {
           scaleDisplayRef.current.innerText = `${Math.round(bounded * 100)}%`;
         }
       }}
-      onZoomStop={handleZoomOrPinchStop}
-      onPinchStop={handleZoomOrPinchStop}
+      onPinch={(ref) => {
+        // onPinch는 반드시 touches.length > 1 일 때만 호출됨 (라이브러리 소스 확인)
+        // 따라서 여기서 저장하는 state는 항상 2손가락 기준의 정상 값
+        lastGoodPinchStateRef.current = {
+          scale: ref.state.scale,
+          positionX: ref.state.positionX,
+          positionY: ref.state.positionY,
+        };
+      }}
+      onZoomStop={handleZoomStop}
+      onPinchStop={handlePinchStop}
     >
       {({ state }) => {
         const handleZoomIn = () => {
@@ -785,25 +816,6 @@ export default function PdfViewer() {
               onMouseDown={(e) => e.stopPropagation()} 
               onTouchStart={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
               onTouchMove={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
-              onTouchEnd={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
-              onPointerDownCapture={(e) => {
-                activePointersRef.current.add(e.pointerId);
-              }}
-              onPointerUpCapture={(e) => {
-                if (activePointersRef.current.size >= 2) {
-                  activePointersRef.current.delete(e.pointerId);
-                  if (activePointersRef.current.size === 1) {
-                    // 핀치 중 한 손가락이 떨어지면, 라이브러리가 폭주하기 전에 즉시 강제 취소 이벤트를 발송하여 줌을 안전하게 종료
-                    e.target.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true }));
-                    e.stopPropagation();
-                  }
-                } else {
-                  activePointersRef.current.delete(e.pointerId);
-                }
-              }}
-              onPointerCancelCapture={(e) => {
-                activePointersRef.current.delete(e.pointerId);
-              }}
               className="w-full flex flex-col items-start p-4"
             >
               <Document
