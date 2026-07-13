@@ -147,8 +147,10 @@ export default function PdfViewer() {
       pendingResetTransformRef.current = false;
     }
     if (pendingScrollRef.current && containerRef.current) {
-      containerRef.current.scrollLeft = pendingScrollRef.current.x;
-      containerRef.current.scrollTop = pendingScrollRef.current.y;
+      const maxScrollX = containerRef.current.scrollWidth - containerRef.current.clientWidth;
+      const maxScrollY = containerRef.current.scrollHeight - containerRef.current.clientHeight;
+      containerRef.current.scrollLeft = Math.max(0, Math.min(pendingScrollRef.current.x, maxScrollX));
+      containerRef.current.scrollTop = Math.max(0, Math.min(pendingScrollRef.current.y, maxScrollY));
       pendingScrollRef.current = null;
     }
   }, [customScale, zoomMode]);
@@ -264,12 +266,18 @@ export default function PdfViewer() {
     if (!pdfWrapperRef.current || !containerRef.current) return;
     
     const { currentScale, customScale, zoomMode } = stateRef.current;
+    const el = containerRef.current;
+    const wrapperRect = pdfWrapperRef.current.getBoundingClientRect();
+    
+    // 클릭 지점의 문서 내 좌표 (현재 렌더링 기준)
+    const docX = clientX - wrapperRect.left + el.scrollLeft;
+    const docY = clientY - wrapperRect.top + el.scrollTop;
+    // 클릭 지점의 뷰포트 내 상대 좌표
+    const containerRect = el.getBoundingClientRect();
+    const viewX = clientX - containerRect.left;
+    const viewY = clientY - containerRect.top;
     
     if (isQuickZoomed && quickZoomOriginalRef.current) {
-      const rect = pdfWrapperRef.current.getBoundingClientRect();
-      const docX = clientX - rect.left;
-      const docY = clientY - rect.top;
-      
       const targetScale = quickZoomOriginalRef.current.scale;
       const ratio = targetScale / currentScale;
       
@@ -277,29 +285,18 @@ export default function PdfViewer() {
       setZoomMode(quickZoomOriginalRef.current.zoomMode);
       setCustomScale(targetScale);
       
-      const containerRect = containerRef.current.getBoundingClientRect();
-      const newDocY = docY * ratio;
-      
       if (quickZoomOriginalRef.current.zoomMode === "fit") {
-        pendingScrollRef.current = { x: 0, y: newDocY + containerRect.top + 16 - clientY };
+        pendingScrollRef.current = { x: 0, y: Math.max(0, docY * ratio - viewY) };
       } else {
-        const newDocX = docX * ratio;
         pendingScrollRef.current = {
-          x: newDocX + containerRect.left + 16 - clientX,
-          y: newDocY + containerRect.top + 16 - clientY
+          x: Math.max(0, docX * ratio - viewX),
+          y: Math.max(0, docY * ratio - viewY)
         };
       }
       pendingResetTransformRef.current = true;
     } else {
-      const rect = pdfWrapperRef.current.getBoundingClientRect();
-      const docX = clientX - rect.left;
-      const docY = clientY - rect.top;
-      
       const targetScale = Math.min(currentScale * 2, 8.0);
       const ratio = targetScale / currentScale;
-      
-      const newDocX = docX * ratio;
-      const newDocY = docY * ratio;
       
       // fit 모드일 때는 fitScale을, custom 모드일 때는 customScale을 보존
       const scaleToSave = zoomMode === "fit" ? stateRef.current.fitScale : customScale;
@@ -309,10 +306,9 @@ export default function PdfViewer() {
       setZoomMode("custom");
       setCustomScale(targetScale);
       
-      const containerRect = containerRef.current.getBoundingClientRect();
       pendingScrollRef.current = {
-        x: newDocX + containerRect.left + 16 - clientX,
-        y: newDocY + containerRect.top + 16 - clientY
+        x: Math.max(0, docX * ratio - viewX),
+        y: Math.max(0, docY * ratio - viewY)
       };
       pendingResetTransformRef.current = true;
     }
@@ -445,7 +441,7 @@ export default function PdfViewer() {
   
   stateRef.current = { currentScale, zoomMode, customScale, fitScale };
 
-  // onZoomStop / onPinchStop 공통 핸들러
+  // onZoomStop / onPinchStop 공통 핸들러: 뷰포트 중앙 기준 비례 좌표 재매핑
   const handleZoomOrPinchStop = (ref: { state: { scale: number; positionX: number; positionY: number }; resetTransform: (duration: number) => void }) => {
     setIsQuickZoomed(false);
     const { currentScale, zoomMode, customScale } = stateRef.current;
@@ -454,28 +450,35 @@ export default function PdfViewer() {
     const posY = ref.state.positionY;
     if (Math.abs(cssScale - 1) > 0.001 || Math.abs(posX) > 0 || Math.abs(posY) > 0) {
       const el = containerRef.current;
-      const scrollY = el ? el.scrollTop : 0;
-      const scrollX = el ? el.scrollLeft : 0;
+      if (!el) return;
+      const scrollY = el.scrollTop;
+      const scrollX = el.scrollLeft;
+      const viewCenterX = el.clientWidth / 2;
+      const viewCenterY = el.clientHeight / 2;
       
       const newScale = Math.min(Math.max(0.25, currentScale * cssScale), 8.0);
+      const ratio = newScale / currentScale;
       
-      const wasFit = zoomMode === "fit";
-      const xOffset = wasFit ? (16 * cssScale) : 0;
+      // 뷰포트 중앙에 해당하는 문서 좌표 (CSS transform 적용 전 기준)
+      const docCenterX = (scrollX + viewCenterX - posX) / cssScale;
+      const docCenterY = (scrollY + viewCenterY - posY) / cssScale;
+      
+      // 새 배율에서 같은 문서 좌표가 뷰포트 중앙에 오도록 스크롤 계산
+      const newScrollX = docCenterX * ratio - viewCenterX;
+      const newScrollY = docCenterY * ratio - viewCenterY;
       
       if (newScale === customScale && zoomMode === "custom") {
-        // No React render needed, reset instantly to prevent bounce animation
+        // React 렌더 불필요: 즉시 리셋하여 바운스 애니메이션 방지
         transformRef.current?.resetTransform(0);
-        if (el) {
-          el.scrollLeft = scrollX - posX - xOffset;
-          el.scrollTop = scrollY - posY;
-        }
+        el.scrollLeft = Math.max(0, newScrollX);
+        el.scrollTop = Math.max(0, newScrollY);
       } else {
         setZoomMode("custom");
         setCustomScale(newScale);
         
         pendingScrollRef.current = {
-          x: scrollX - posX - xOffset,
-          y: scrollY - posY
+          x: newScrollX,
+          y: newScrollY
         };
         
         pendingResetTransformRef.current = true;
@@ -519,10 +522,25 @@ export default function PdfViewer() {
           if (currentPct >= 200) step = 20;
           else if (currentPct >= 130) step = 10;
           
-          let nextPct = Math.ceil((currentPct + 1) / step) * step;
+          const nextPct = Math.ceil((currentPct + 1) / step) * step;
+          const newScale = Math.min(nextPct / 100, 8.0);
+          
+          // 뷰포트 중앙 유지 스크롤 계산
+          const el = containerRef.current;
+          if (el) {
+            const ratio = newScale / currentScale;
+            const viewCenterX = el.clientWidth / 2;
+            const viewCenterY = el.clientHeight / 2;
+            const docCenterX = el.scrollLeft + viewCenterX;
+            const docCenterY = el.scrollTop + viewCenterY;
+            pendingScrollRef.current = {
+              x: docCenterX * ratio - viewCenterX,
+              y: docCenterY * ratio - viewCenterY
+            };
+          }
           
           setZoomMode("custom");
-          setCustomScale(Math.min(nextPct / 100, 8.0));
+          setCustomScale(newScale);
           pendingResetTransformRef.current = true;
         };
 
@@ -535,10 +553,25 @@ export default function PdfViewer() {
           if (currentPct > 200) step = 20;
           else if (currentPct > 130) step = 10;
           
-          let nextPct = Math.floor((currentPct - 1) / step) * step;
+          const nextPct = Math.floor((currentPct - 1) / step) * step;
+          const newScale = Math.max(nextPct / 100, 0.25);
+          
+          // 뷰포트 중앙 유지 스크롤 계산
+          const el = containerRef.current;
+          if (el) {
+            const ratio = newScale / currentScale;
+            const viewCenterX = el.clientWidth / 2;
+            const viewCenterY = el.clientHeight / 2;
+            const docCenterX = el.scrollLeft + viewCenterX;
+            const docCenterY = el.scrollTop + viewCenterY;
+            pendingScrollRef.current = {
+              x: docCenterX * ratio - viewCenterX,
+              y: docCenterY * ratio - viewCenterY
+            };
+          }
           
           setZoomMode("custom");
-          setCustomScale(Math.max(nextPct / 100, 0.25));
+          setCustomScale(newScale);
           pendingResetTransformRef.current = true;
         };
 
@@ -546,6 +579,10 @@ export default function PdfViewer() {
           setIsQuickZoomed(false);
           setZoomMode("fit");
           transformRef.current?.resetTransform(0);
+          if (containerRef.current) {
+            containerRef.current.scrollLeft = 0;
+            containerRef.current.scrollTop = 0;
+          }
         };
         
         return (
@@ -645,7 +682,7 @@ export default function PdfViewer() {
       {/* PDF Canvas */}
       <div 
         ref={containerRef}
-        className={`flex-1 p-4 bg-surface-dim relative ${zoomMode === "fit" ? "overflow-y-auto overflow-x-hidden" : "overflow-auto"}`}
+        className={`flex-1 bg-surface-dim relative ${zoomMode === "fit" ? "overflow-y-auto overflow-x-hidden" : "overflow-auto"}`}
         onClick={handleContainerClick}
         onMouseUp={handleMouseUp}
       >
@@ -721,7 +758,7 @@ export default function PdfViewer() {
               onMouseDown={(e) => e.stopPropagation()} 
               onTouchStart={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
               onTouchMove={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
-              className={`w-full flex flex-col ${zoomMode === "fit" ? "items-center" : "items-start"}`}
+              className={`w-full flex flex-col ${zoomMode === "fit" ? "items-center" : "items-start"} p-4`}
             >
               <Document
                 file={fileData}
