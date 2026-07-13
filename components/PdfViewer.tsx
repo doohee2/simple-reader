@@ -130,6 +130,16 @@ export default function PdfViewer() {
   const transformRef = useRef<any>(null);
   
   const ignoreIntersectRef = useRef(false);
+  const scaleDisplayRef = useRef<HTMLSpanElement>(null);
+  
+  const pdfWrapperRef = useRef<HTMLDivElement>(null);
+  const [isQuickZoomed, setIsQuickZoomed] = useState(false);
+  const quickZoomOriginalRef = useRef<{ scale: number; zoomMode: "fit" | "custom" } | null>(null);
+  const lastClickRef = useRef<{ time: number; x: number; y: number } | null>(null);
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const stateRef = useRef<{ currentScale: number; zoomMode: "fit" | "custom"; customScale: number; fitScale: number }>({ currentScale: 1, zoomMode: "fit", customScale: 1, fitScale: 1 });
+
   const applyZoomWithAnchor = useCallback((targetScale: number, newZoomMode: "fit" | "custom", anchorClientX?: number, anchorClientY?: number) => {
     if (!containerRef.current) return;
     const container = containerRef.current;
