@@ -139,7 +139,7 @@ export default function PdfViewer() {
   const lastClickRef = useRef<{ time: number; x: number; y: number } | null>(null);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  const stateRef = useRef({ currentScale: 1, zoomMode: "fit", customScale: 1, fitScale: 1 });
+  const stateRef = useRef<{ currentScale: number; zoomMode: "fit" | "custom"; customScale: number; fitScale: number }>({ currentScale: 1, zoomMode: "fit", customScale: 1, fitScale: 1 });
 
   useLayoutEffect(() => {
     if (pendingResetTransformRef.current) {
@@ -436,7 +436,7 @@ export default function PdfViewer() {
   const fitScale = (containerWidth && pageBaseWidth) ? (containerWidth - 32) / pageBaseWidth : 1;
   const currentScale = zoomMode === "fit" ? fitScale : customScale;
   
-  stateRef.current = { currentScale, zoomMode, customScale, fitScale } as any;
+  stateRef.current = { currentScale, zoomMode, customScale, fitScale };
 
   return (
     <TransformWrapper
