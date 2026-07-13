@@ -136,6 +136,8 @@ export default function PdfViewer() {
   const [isQuickZoomed, setIsQuickZoomed] = useState(false);
   const [pinchSpikeThreshold, setPinchSpikeThreshold] = useState<number>(10);
   const [showThresholdModal, setShowThresholdModal] = useState(false);
+  const [isDebugMode, setIsDebugMode] = useState(false);
+  const [debugInfo, setDebugInfo] = useState({ event: "", scale: 0, posX: 0, posY: 0, anchorX: 0, anchorY: 0, msg: "" });
   const quickZoomOriginalRef = useRef<{ scale: number; zoomMode: "fit" | "custom" } | null>(null);
   const lastClickRef = useRef<{ time: number; x: number; y: number } | null>(null);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -217,7 +219,10 @@ export default function PdfViewer() {
     container.scrollLeft = Math.max(0, container.scrollLeft + scrollDiffX);
     container.scrollTop = Math.max(0, container.scrollTop + scrollDiffY);
     
-    // 6. Synchronize react-zoom-pan-pinch internal state
+    // 6. Debug info sync
+    setDebugInfo(prev => prev.event === "onPinchStop" ? { ...prev, msg: `scrollLeft: ${Math.round(container.scrollLeft)}, scrollTop: ${Math.round(container.scrollTop)}` } : prev);
+    
+    // 7. Synchronize react-zoom-pan-pinch internal state
     transformRef.current?.resetTransform(0);
   }, []);
 
@@ -550,6 +555,10 @@ export default function PdfViewer() {
     const anchor = pinchCenterRef.current;
     pinchCenterRef.current = null;
     
+    if (isDebugMode) {
+      setDebugInfo(prev => ({ ...prev, event: "onPinchStop", scale: libScale, anchorX: anchor?.x || 0, anchorY: anchor?.y || 0, msg: `targetScale: ${targetScale.toFixed(2)}` }));
+    }
+    
     applyZoomWithAnchor(targetScale, "custom", anchor?.x, anchor?.y);
   };
 
@@ -581,6 +590,9 @@ export default function PdfViewer() {
           // threshold가 10이면 10% (0.1)
           if (diff > lastGood.scale * (pinchSpikeThreshold / 100)) {
             // 튄 값 무시 (Drop frame)
+            if (isDebugMode) {
+              setDebugInfo(prev => ({ ...prev, event: "SPIKE_DROPPED", msg: `diff: ${diff.toFixed(2)} > cutoff` }));
+            }
             return;
           }
         }
@@ -591,6 +603,18 @@ export default function PdfViewer() {
           positionX: ref.state.positionX,
           positionY: ref.state.positionY,
         };
+        
+        if (isDebugMode) {
+          setDebugInfo({
+            event: "onPinch",
+            scale: ref.state.scale,
+            posX: ref.state.positionX,
+            posY: ref.state.positionY,
+            anchorX: pinchCenterRef.current?.x || 0,
+            anchorY: pinchCenterRef.current?.y || 0,
+            msg: "tracking"
+          });
+        }
       }}
       onZoomStop={handleZoomStop}
       onPinchStop={handlePinchStop}
@@ -761,6 +785,18 @@ export default function PdfViewer() {
           }
         }}
       >
+        {isDebugMode && (
+          <div className="fixed top-20 left-4 z-50 bg-black/80 text-green-400 font-mono text-[11px] p-3 rounded pointer-events-none whitespace-pre border border-green-500/50 shadow-lg leading-relaxed">
+            <div className="font-bold border-b border-green-500/50 pb-1 mb-1">[Pinch Debug]</div>
+            <div>event: {debugInfo.event}</div>
+            <div>scale: {debugInfo.scale.toFixed(4)}</div>
+            <div>posX: {debugInfo.posX.toFixed(2)}</div>
+            <div>posY: {debugInfo.posY.toFixed(2)}</div>
+            <div>anchorX: {debugInfo.anchorX.toFixed(2)}</div>
+            <div>anchorY: {debugInfo.anchorY.toFixed(2)}</div>
+            <div className="text-yellow-400 mt-1">msg: {debugInfo.msg}</div>
+          </div>
+        )}
         {tooltipPos && (
           <div 
             className="absolute z-50 flex items-center gap-1 bg-surface/90 backdrop-blur-md shadow-[0_4px_12px_rgba(0,0,0,0.5)] rounded-lg border border-primary/50 p-1.5 animate-in fade-in zoom-in-95 duration-200"
@@ -891,6 +927,18 @@ export default function PdfViewer() {
                 />
                 <span className="text-ui-label-md text-primary w-8 text-right">{pinchSpikeThreshold}%</span>
               </div>
+              
+              <div className="flex items-center gap-2 mb-6 bg-surface-dim p-3 rounded-lg border border-outline-variant">
+                <input 
+                  type="checkbox" 
+                  id="debugMode"
+                  checked={isDebugMode}
+                  onChange={(e) => setIsDebugMode(e.target.checked)}
+                  className="w-4 h-4 accent-primary"
+                />
+                <label htmlFor="debugMode" className="text-ui-body-sm text-on-surface cursor-pointer select-none">디버그 모드 켜기 (실시간 수치 오버레이 표시)</label>
+              </div>
+
               <div className="flex justify-end gap-2">
                 <button 
                   onClick={() => setPinchSpikeThreshold(10)}
