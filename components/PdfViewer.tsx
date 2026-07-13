@@ -137,6 +137,7 @@ export default function PdfViewer() {
   const quickZoomOriginalRef = useRef<{ scale: number; zoomMode: "fit" | "custom" } | null>(null);
   const lastClickRef = useRef<{ time: number; x: number; y: number } | null>(null);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pinchCenterRef = useRef<{ x: number; y: number } | null>(null);
   
   const stateRef = useRef<{ currentScale: number; zoomMode: "fit" | "custom"; customScale: number; fitScale: number }>({ currentScale: 1, zoomMode: "fit", customScale: 1, fitScale: 1 });
 
@@ -492,15 +493,21 @@ export default function PdfViewer() {
     setIsQuickZoomed(false);
     const libScale = ref.state.scale;
     const currentScale = stateRef.current.currentScale;
-    const ratio = libScale / currentScale;
     
-    if (Math.abs(ratio - 1) < 0.05) {
+    // 라이브러리의 scale은 항상 1부터 시작하는 상대적 배율
+    if (Math.abs(libScale - 1) < 0.05) {
       transformRef.current?.resetTransform(0);
       return;
     }
     
-    const targetScale = Math.min(Math.max(currentScale * ratio, 0.25), 8.0);
-    applyZoomWithAnchor(targetScale, "custom");
+    // 현재 스케일에 라이브러리 스케일을 그대로 곱함 (왜곡 방지)
+    const targetScale = Math.min(Math.max(currentScale * libScale, 0.25), 8.0);
+    
+    // 저장해둔 핀치 중심점 사용 후 초기화
+    const anchor = pinchCenterRef.current;
+    pinchCenterRef.current = null;
+    
+    applyZoomWithAnchor(targetScale, "custom", anchor?.x, anchor?.y);
   };
 
   return (
@@ -678,6 +685,14 @@ export default function PdfViewer() {
         ref={containerRef}
         className={`flex-1 bg-surface-dim relative ${zoomMode === "fit" ? "overflow-y-auto overflow-x-hidden" : "overflow-auto"}`}
         onClick={handleContainerClick}
+        onTouchMove={(e) => {
+          if (e.touches.length === 2) {
+            pinchCenterRef.current = {
+              x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+              y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+            };
+          }
+        }}
       >
         {tooltipPos && (
           <div 
