@@ -139,11 +139,11 @@ export default function PdfViewer() {
     const clientY = anchorClientY ?? (container.getBoundingClientRect().top + container.clientHeight / 2);
     
     // 1. Find the page element under the anchor point or closest to it
-    let anchorPageEl = (document.elementFromPoint(clientX, clientY)?.closest('.react-pdf__Page') as HTMLElement) || null;
+    let anchorPageEl: HTMLElement | null = (document.elementFromPoint(clientX, clientY)?.closest('.react-pdf__Page') as HTMLElement) || null;
     
     if (!anchorPageEl) {
       const pages = Array.from(document.querySelectorAll('.react-pdf__Page')) as HTMLElement[];
-      let closestPage = null;
+      let closestPage: HTMLElement | null = null;
       let minDistance = Infinity;
       for (const page of pages) {
         const rect = page.getBoundingClientRect();
