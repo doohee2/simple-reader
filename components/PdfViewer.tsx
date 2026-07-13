@@ -263,19 +263,19 @@ export default function PdfViewer() {
   };
 
   const handleDoubleClick = (clientX: number, clientY: number) => {
-    if (!pdfWrapperRef.current || !containerRef.current) return;
+    if (!containerRef.current) return;
     
     const { currentScale, customScale, zoomMode } = stateRef.current;
     const el = containerRef.current;
-    const wrapperRect = pdfWrapperRef.current.getBoundingClientRect();
-    
-    // 클릭 지점의 문서 내 좌표 (현재 렌더링 기준)
-    const docX = clientX - wrapperRect.left + el.scrollLeft;
-    const docY = clientY - wrapperRect.top + el.scrollTop;
-    // 클릭 지점의 뷰포트 내 상대 좌표
     const containerRect = el.getBoundingClientRect();
+    
+    // 클릭 지점의 뷰포트 내 상대 좌표
     const viewX = clientX - containerRect.left;
     const viewY = clientY - containerRect.top;
+    
+    // 클릭 지점의 문서 내 절대 좌표 (스크롤 포함)
+    const docX = el.scrollLeft + viewX;
+    const docY = el.scrollTop + viewY;
     
     if (isQuickZoomed && quickZoomOriginalRef.current) {
       const targetScale = quickZoomOriginalRef.current.scale;
@@ -286,6 +286,7 @@ export default function PdfViewer() {
       setCustomScale(targetScale);
       
       if (quickZoomOriginalRef.current.zoomMode === "fit") {
+        // fit 모드로 복귀 시 x=0, y는 클릭 지점 기준 비례 계산
         pendingScrollRef.current = { x: 0, y: Math.max(0, docY * ratio - viewY) };
       } else {
         pendingScrollRef.current = {
@@ -306,6 +307,7 @@ export default function PdfViewer() {
       setZoomMode("custom");
       setCustomScale(targetScale);
       
+      // 클릭한 지점이 화면에서 같은 위치에 유지되도록 스크롤
       pendingScrollRef.current = {
         x: Math.max(0, docX * ratio - viewX),
         y: Math.max(0, docY * ratio - viewY)
