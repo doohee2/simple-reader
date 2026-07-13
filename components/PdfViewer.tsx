@@ -301,7 +301,9 @@ export default function PdfViewer() {
       const newDocX = docX * ratio;
       const newDocY = docY * ratio;
       
-      quickZoomOriginalRef.current = { scale: customScale, zoomMode };
+      // fit 모드일 때는 fitScale을, custom 모드일 때는 customScale을 보존
+      const scaleToSave = zoomMode === "fit" ? stateRef.current.fitScale : customScale;
+      quickZoomOriginalRef.current = { scale: scaleToSave, zoomMode };
       setIsQuickZoomed(true);
       
       setZoomMode("custom");
@@ -324,14 +326,24 @@ export default function PdfViewer() {
       }
       return;
     }
-    
-    if (e.target === e.currentTarget) {
-      handleCleanupSelection();
-    }
-    if (tooltipPos) {
-      setTooltipPos(null);
+
+    // 가장자리 탭 페이지 넘김: 300ms 대기 없이 즉시 실행
+    const { zoomMode: currentZoomMode } = stateRef.current;
+    if (viewMode === "single" && currentZoomMode === "fit" && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const width = rect.width;
+      
+      if (clickX < width * 0.2) {
+        if (pageNumber > 1) previousPage();
+        return;
+      } else if (clickX > width * 0.8) {
+        if (pageNumber < numPages) nextPage();
+        return;
+      }
     }
 
+    // 더블클릭 판정 (중앙 영역에서만)
     const now = Date.now();
     if (lastClickRef.current && now - lastClickRef.current.time < 300) {
       if (clickTimeoutRef.current) {
@@ -345,19 +357,14 @@ export default function PdfViewer() {
 
     lastClickRef.current = { time: now, x: e.clientX, y: e.clientY };
 
+    // 싱글 클릭 확정 시에만 cleanup 수행
     clickTimeoutRef.current = setTimeout(() => {
       clickTimeoutRef.current = null;
-      const { zoomMode } = stateRef.current;
-      if (viewMode === "single" && zoomMode === "fit" && containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        const width = rect.width;
-        
-        if (clickX < width * 0.2) {
-          if (pageNumber > 1) previousPage();
-        } else if (clickX > width * 0.8) {
-          if (pageNumber < numPages) nextPage();
-        }
+      if (e.target === e.currentTarget) {
+        handleCleanupSelection();
+      }
+      if (tooltipPos) {
+        setTooltipPos(null);
       }
     }, 300);
   };
@@ -438,6 +445,44 @@ export default function PdfViewer() {
   
   stateRef.current = { currentScale, zoomMode, customScale, fitScale };
 
+  // onZoomStop / onPinchStop 공통 핸들러
+  const handleZoomOrPinchStop = (ref: { state: { scale: number; positionX: number; positionY: number }; resetTransform: (duration: number) => void }) => {
+    setIsQuickZoomed(false);
+    const { currentScale, zoomMode, customScale } = stateRef.current;
+    const cssScale = ref.state.scale;
+    const posX = ref.state.positionX;
+    const posY = ref.state.positionY;
+    if (Math.abs(cssScale - 1) > 0.001 || Math.abs(posX) > 0 || Math.abs(posY) > 0) {
+      const el = containerRef.current;
+      const scrollY = el ? el.scrollTop : 0;
+      const scrollX = el ? el.scrollLeft : 0;
+      
+      const newScale = Math.min(Math.max(0.25, currentScale * cssScale), 8.0);
+      
+      const wasFit = zoomMode === "fit";
+      const xOffset = wasFit ? (16 * cssScale) : 0;
+      
+      if (newScale === customScale && zoomMode === "custom") {
+        // No React render needed, reset instantly to prevent bounce animation
+        transformRef.current?.resetTransform(0);
+        if (el) {
+          el.scrollLeft = scrollX - posX - xOffset;
+          el.scrollTop = scrollY - posY;
+        }
+      } else {
+        setZoomMode("custom");
+        setCustomScale(newScale);
+        
+        pendingScrollRef.current = {
+          x: scrollX - posX - xOffset,
+          y: scrollY - posY
+        };
+        
+        pendingResetTransformRef.current = true;
+      }
+    }
+  };
+
   return (
     <TransformWrapper
       ref={transformRef}
@@ -459,77 +504,8 @@ export default function PdfViewer() {
           scaleDisplayRef.current.innerText = `${Math.round(bounded * 100)}%`;
         }
       }}
-      onZoomStop={(ref) => {
-        setIsQuickZoomed(false);
-        const { currentScale, zoomMode, customScale, fitScale } = stateRef.current;
-        const cssScale = ref.state.scale;
-        const posX = ref.state.positionX;
-        const posY = ref.state.positionY;
-        if (Math.abs(cssScale - 1) > 0.001 || Math.abs(posX) > 0 || Math.abs(posY) > 0) {
-          const el = containerRef.current;
-          const scrollY = el ? el.scrollTop : 0;
-          const scrollX = el ? el.scrollLeft : 0;
-          
-          const newScale = Math.min(Math.max(0.25, currentScale * cssScale), 8.0);
-          
-          const wasFit = zoomMode === "fit";
-          const xOffset = wasFit ? (16 * cssScale) : 0;
-          
-          if (newScale === customScale && zoomMode === "custom") {
-            // No React render needed, reset instantly to prevent bounce animation
-            transformRef.current?.resetTransform(0);
-            if (el) {
-              el.scrollLeft = scrollX - posX - xOffset;
-              el.scrollTop = scrollY - posY;
-            }
-          } else {
-            setZoomMode("custom");
-            setCustomScale(newScale);
-            
-            pendingScrollRef.current = {
-              x: scrollX - posX - xOffset,
-              y: scrollY - posY
-            };
-            
-            pendingResetTransformRef.current = true;
-          }
-        }
-      }}
-      onPinchStop={(ref) => {
-        setIsQuickZoomed(false);
-        const { currentScale, zoomMode, customScale, fitScale } = stateRef.current;
-        const cssScale = ref.state.scale;
-        const posX = ref.state.positionX;
-        const posY = ref.state.positionY;
-        if (Math.abs(cssScale - 1) > 0.001 || Math.abs(posX) > 0 || Math.abs(posY) > 0) {
-          const el = containerRef.current;
-          const scrollY = el ? el.scrollTop : 0;
-          const scrollX = el ? el.scrollLeft : 0;
-          
-          const newScale = Math.min(Math.max(0.25, currentScale * cssScale), 8.0);
-          
-          const wasFit = zoomMode === "fit";
-          const xOffset = wasFit ? (16 * cssScale) : 0;
-          
-          if (newScale === customScale && zoomMode === "custom") {
-            transformRef.current?.resetTransform(0);
-            if (el) {
-              el.scrollLeft = scrollX - posX - xOffset;
-              el.scrollTop = scrollY - posY;
-            }
-          } else {
-            setZoomMode("custom");
-            setCustomScale(newScale);
-            
-            pendingScrollRef.current = {
-              x: scrollX - posX - xOffset,
-              y: scrollY - posY
-            };
-            
-            pendingResetTransformRef.current = true;
-          }
-        }
-      }}
+      onZoomStop={handleZoomOrPinchStop}
+      onPinchStop={handleZoomOrPinchStop}
     >
       {({ state }) => {
         const displayedScale = stateRef.current.zoomMode === "fit" ? stateRef.current.fitScale : stateRef.current.customScale;
@@ -737,13 +713,12 @@ export default function PdfViewer() {
 
         {!isLoading && downloadState === "success" && fileData && (
           <TransformComponent 
-            wrapperClass={`!touch-${zoomMode === "fit" ? "pan-y" : "auto"}`}
             wrapperStyle={{ width: "100%", height: "auto", overflow: "visible", touchAction: zoomMode === "fit" ? "pan-y" : "auto", userSelect: "text" }} 
             contentStyle={{ minWidth: "100%", width: "auto", display: "flex", flexDirection: "column", alignItems: zoomMode === "fit" ? "center" : "flex-start", userSelect: "text" }}
-            >
-              <div 
-                ref={pdfWrapperRef}
-                onMouseDown={(e) => e.stopPropagation()} 
+          >
+            <div 
+              ref={pdfWrapperRef}
+              onMouseDown={(e) => e.stopPropagation()} 
               onTouchStart={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
               onTouchMove={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
               className={`w-full flex flex-col ${zoomMode === "fit" ? "items-center" : "items-start"}`}
@@ -785,9 +760,9 @@ export default function PdfViewer() {
             </div>
           </TransformComponent>
         )}
-      </div>
-    </section>
-  )}}
-</TransformWrapper>
+        </div>
+      </section>
+    )}}
+    </TransformWrapper>
   );
 }
