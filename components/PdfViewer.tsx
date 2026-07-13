@@ -192,6 +192,7 @@ export default function PdfViewer() {
     const ratioY = (clientY - initialPageRect.top) / initialPageRect.height;
     
     // 3. Clear transform to prevent visual flicker
+    const transformComponent = document.querySelector('.react-transform-component') as HTMLElement;
     if (transformComponent) {
       transformComponent.style.transform = "";
     }
