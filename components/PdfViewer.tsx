@@ -138,7 +138,6 @@ export default function PdfViewer() {
   const lastClickRef = useRef<{ time: number; x: number; y: number } | null>(null);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pinchCenterRef = useRef<{ x: number; y: number } | null>(null);
-  const safeTransformRef = useRef<{ scale: number; x: number; y: number } | null>(null);
   
   const stateRef = useRef<{ currentScale: number; zoomMode: "fit" | "custom"; customScale: number; fitScale: number }>({ currentScale: 1, zoomMode: "fit", customScale: 1, fitScale: 1 });
 
@@ -146,13 +145,6 @@ export default function PdfViewer() {
     if (!containerRef.current) return;
     const container = containerRef.current;
     
-    // --- 방어 로직: 측정 전에 쓰레기 Transform 복구 ---
-    const transformComponent = document.querySelector('.react-transform-component') as HTMLElement;
-    if (transformComponent && safeTransformRef.current) {
-      transformComponent.style.transform = `translate3d(${safeTransformRef.current.x}px, ${safeTransformRef.current.y}px, 0px) scale(${safeTransformRef.current.scale})`;
-    }
-    // ------------------------------------------------
-
     // Determine the viewport anchor if no specific coordinates provided
     const clientX = anchorClientX ?? (container.getBoundingClientRect().left + container.clientWidth / 2);
     const clientY = anchorClientY ?? (container.getBoundingClientRect().top + container.clientHeight / 2);
@@ -203,8 +195,6 @@ export default function PdfViewer() {
     if (transformComponent) {
       transformComponent.style.transform = "";
     }
-    
-    safeTransformRef.current = null; // 정리
     
     // 4. Synchronously update React state and DOM
     flushSync(() => {
@@ -510,14 +500,12 @@ export default function PdfViewer() {
   const handleZoomOrPinchStop = (ref: any) => {
     setIsQuickZoomed(false);
     
-    // safeTransformRef에 저장된 스냅샷이 있다면 이를 우선 적용 (가짜 배율 방어)
-    const libScale = safeTransformRef.current ? safeTransformRef.current.scale : ref.state.scale;
+    const libScale = ref.state.scale;
     const currentScale = stateRef.current.currentScale;
     
     // 라이브러리의 scale은 항상 1부터 시작하는 상대적 배율
     if (Math.abs(libScale - 1) < 0.05) {
       transformRef.current?.resetTransform(0);
-      safeTransformRef.current = null;
       return;
     }
     
@@ -540,7 +528,7 @@ export default function PdfViewer() {
       panning={{ 
         disabled: true, 
       }}
-      wheel={{ wheelDisabled: false, step: 0.02, activationKeys: ["Control"] }}
+      wheel={{ wheelDisabled: true }}
       pinch={{ step: 5 }}
       doubleClick={{ disabled: true }}
       onTransform={(ref, state) => {
@@ -787,16 +775,7 @@ export default function PdfViewer() {
               onMouseDown={(e) => e.stopPropagation()} 
               onTouchStart={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
               onTouchMove={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
-              onTouchEnd={(e) => { 
-                if (e.touches.length === 1 && transformRef.current) {
-                  // 첫 손가락이 떨어지는 찰나의 정상 상태를 스냅샷으로 저장
-                  safeTransformRef.current = {
-                    scale: transformRef.current.state.scale,
-                    x: transformRef.current.state.positionX,
-                    y: transformRef.current.state.positionY
-                  };
-                }
-              }}
+              onTouchEnd={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
               className="w-full flex flex-col items-start p-4"
             >
               <Document
