@@ -19,7 +19,7 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
     }
   }, [forceTab]);
 
-  const { selectedFileId, selectedText, currentPage, actionIntent, clearActionIntent, setTargetPage, clearSelectedText } = useStore();
+  const { selectedFileId, selectedText, setSelectedText, currentPage, actionIntent, clearActionIntent, setTargetPage, clearSelectedText } = useStore();
   
   const [selectedModel, setSelectedModel] = useState("gemini-flash-lite-latest");
   const [customPrompt, setCustomPrompt] = useState("설명 없이 번역한 결과만");
@@ -99,8 +99,7 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
       setNewMemoContent("");
       clearActionIntent();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actionIntent, handleTranslate, clearActionIntent]);
+  }, [actionIntent, clearActionIntent, handleTranslate]);
 
   const handleStartEdit = (id: string, content: string) => {
     setEditingId(id);
@@ -182,16 +181,20 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
                   </div>
                 )}
               </span>
-              <div className="bg-surface-container-low border-l-2 border-outline-variant p-4 rounded-r-lg min-h-[60px] flex items-center">
-                {selectedText ? (
-                  <p className="font-reading-body text-reading-body text-on-surface italic text-sm">
-                    &quot;{selectedText}&quot;
-                  </p>
-                ) : (
-                  <p className="text-ui-body text-on-surface-variant italic text-sm">
-                    좌측 PDF에서 텍스트를 드래그하여 선택해 주세요.
-                  </p>
-                )}
+              <div className="bg-surface-container-low border-l-2 border-outline-variant p-3 rounded-r-lg min-h-[60px] flex">
+                <textarea
+                  value={selectedText}
+                  onChange={(e) => {
+                    const text = e.target.value;
+                    if (text) {
+                      setSelectedText(text, currentPage);
+                    } else {
+                      clearSelectedText();
+                    }
+                  }}
+                  placeholder="좌측 PDF에서 텍스트를 드래그하거나 이곳에 직접 입력해 주세요."
+                  className="w-full bg-transparent border-none resize-y min-h-[60px] font-reading-body text-reading-body text-on-surface text-sm focus:outline-none placeholder:text-ui-body placeholder:text-on-surface-variant/70 custom-scrollbar"
+                />
               </div>
             </div>
 
