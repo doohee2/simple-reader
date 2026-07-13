@@ -775,6 +775,7 @@ export default function PdfViewer() {
               onMouseDown={(e) => e.stopPropagation()} 
               onTouchStart={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
               onTouchMove={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
+              onTouchEnd={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
               className="w-full flex flex-col items-start p-4"
             >
               <Document
