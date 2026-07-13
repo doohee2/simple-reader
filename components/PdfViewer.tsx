@@ -138,6 +138,8 @@ export default function PdfViewer() {
   const quickZoomOriginalRef = useRef<{ scale: number; zoomMode: "fit" | "custom" } | null>(null);
   const lastClickRef = useRef<{ time: number; x: number; y: number } | null>(null);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const stateRef = useRef({ currentScale: 1, zoomMode: "fit", customScale: 1, fitScale: 1 });
 
   useLayoutEffect(() => {
     if (pendingResetTransformRef.current) {
@@ -261,6 +263,8 @@ export default function PdfViewer() {
   const handleDoubleClick = (clientX: number, clientY: number) => {
     if (!pdfWrapperRef.current || !containerRef.current) return;
     
+    const { currentScale, customScale, zoomMode } = stateRef.current;
+    
     if (isQuickZoomed && quickZoomOriginalRef.current) {
       const rect = pdfWrapperRef.current.getBoundingClientRect();
       const docX = clientX - rect.left;
@@ -343,6 +347,7 @@ export default function PdfViewer() {
 
     clickTimeoutRef.current = setTimeout(() => {
       clickTimeoutRef.current = null;
+      const { zoomMode } = stateRef.current;
       if (viewMode === "single" && zoomMode === "fit" && containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
@@ -430,6 +435,8 @@ export default function PdfViewer() {
 
   const fitScale = (containerWidth && pageBaseWidth) ? (containerWidth - 32) / pageBaseWidth : 1;
   const currentScale = zoomMode === "fit" ? fitScale : customScale;
+  
+  stateRef.current = { currentScale, zoomMode, customScale, fitScale } as any;
 
   return (
     <TransformWrapper
@@ -446,6 +453,7 @@ export default function PdfViewer() {
       onTransform={(ref, state) => {
         if (pendingResetTransformRef.current) return;
         if (scaleDisplayRef.current) {
+          const { currentScale } = stateRef.current;
           const perceived = currentScale * state.scale;
           const bounded = Math.min(Math.max(0.25, perceived), 8.0);
           scaleDisplayRef.current.innerText = `${Math.round(bounded * 100)}%`;
@@ -453,6 +461,7 @@ export default function PdfViewer() {
       }}
       onZoomStop={(ref) => {
         setIsQuickZoomed(false);
+        const { currentScale, zoomMode, customScale, fitScale } = stateRef.current;
         const cssScale = ref.state.scale;
         const posX = ref.state.positionX;
         const posY = ref.state.positionY;
@@ -488,6 +497,7 @@ export default function PdfViewer() {
       }}
       onPinchStop={(ref) => {
         setIsQuickZoomed(false);
+        const { currentScale, zoomMode, customScale, fitScale } = stateRef.current;
         const cssScale = ref.state.scale;
         const posX = ref.state.positionX;
         const posY = ref.state.positionY;
@@ -522,11 +532,12 @@ export default function PdfViewer() {
       }}
     >
       {({ state }) => {
-        const displayedScale = zoomMode === "fit" ? fitScale : customScale;
+        const displayedScale = stateRef.current.zoomMode === "fit" ? stateRef.current.fitScale : stateRef.current.customScale;
         
         const handleZoomIn = () => {
           setIsQuickZoomed(false);
-          const perceived = displayedScale * state.scale;
+          const { currentScale } = stateRef.current;
+          const perceived = currentScale * state.scale;
           const currentPct = perceived * 100;
           let step = 5;
           if (currentPct >= 200) step = 20;
@@ -541,7 +552,8 @@ export default function PdfViewer() {
 
         const handleZoomOut = () => {
           setIsQuickZoomed(false);
-          const perceived = displayedScale * state.scale;
+          const { currentScale } = stateRef.current;
+          const perceived = currentScale * state.scale;
           const currentPct = perceived * 100;
           let step = 5;
           if (currentPct > 200) step = 20;
