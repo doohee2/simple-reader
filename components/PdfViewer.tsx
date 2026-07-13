@@ -373,15 +373,7 @@ export default function PdfViewer() {
   };
 
   const handleContainerClick = (e: React.MouseEvent) => {
-    const selection = window.getSelection();
-    if (selection && selection.toString().trim().length > 0) {
-      if (e.target === e.currentTarget) {
-        handleCleanupSelection();
-      }
-      return;
-    }
-
-    // 가장자리 탭 페이지 넘김: 300ms 대기 없이 즉시 실행
+    // 1. 가장자리 탭 페이지 넘김: 300ms 대기 없이 즉시 실행
     const { zoomMode: currentZoomMode } = stateRef.current;
     if (viewMode === "single" && currentZoomMode === "fit" && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
@@ -397,7 +389,7 @@ export default function PdfViewer() {
       }
     }
 
-    // 더블클릭 판정 (중앙 영역에서만)
+    // 2. 더블클릭 판정 (텍스트 선택 여부와 무관하게 작동)
     const now = Date.now();
     if (lastClickRef.current && now - lastClickRef.current.time < 300) {
       if (clickTimeoutRef.current) {
@@ -405,13 +397,29 @@ export default function PdfViewer() {
         clickTimeoutRef.current = null;
       }
       lastClickRef.current = null;
+      
+      // 브라우저 기본 더블클릭에 의한 텍스트 선택 해제 (줌을 의도했으므로)
+      const selection = window.getSelection();
+      if (selection) {
+        selection.removeAllRanges();
+      }
+      
       handleDoubleClick(e.clientX, e.clientY);
       return;
     }
 
     lastClickRef.current = { time: now, x: e.clientX, y: e.clientY };
 
-    // 싱글 클릭 확정 시에만 cleanup 수행
+    // 3. 현재 텍스트가 선택되어 있다면 다른 단일 클릭 동작 무시
+    const selection = window.getSelection();
+    if (selection && selection.toString().trim().length > 0) {
+      if (e.target === e.currentTarget) {
+        handleCleanupSelection();
+      }
+      return;
+    }
+
+    // 4. 싱글 클릭 확정 시에만 cleanup 수행
     clickTimeoutRef.current = setTimeout(() => {
       clickTimeoutRef.current = null;
       if (e.target === e.currentTarget) {
