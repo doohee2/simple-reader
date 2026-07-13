@@ -21,7 +21,7 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
 
   const { selectedFileId, selectedText, currentPage, actionIntent, clearActionIntent, setTargetPage, clearSelectedText } = useStore();
   
-  const [selectedModel, setSelectedModel] = useState("gemini-3.1-flash-lite");
+  const [selectedModel, setSelectedModel] = useState("gemini-flash-lite-latest");
   const [customPrompt, setCustomPrompt] = useState("설명 없이 번역한 결과만");
   const [translationResult, setTranslationResult] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
@@ -204,10 +204,9 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
                   className="bg-surface border border-outline-variant rounded-lg px-2 py-3 text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm w-[40%]"
                   disabled={isTranslating}
                 >
-                  <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite</option>
-                  <option value="gemini-3.1-flash">gemini-3.1-flash</option>
+                  <option value="gemini-flash-lite-latest">gemini-flash-lite-latest</option>
                   <option value="gemini-flash-latest">gemini-flash-latest</option>
-                  <option value="gemini-3.1-pro">gemini-3.1-pro</option>
+                  <option value="gemini-pro-latest">gemini-pro-latest</option>
                 </select>
                 <input
                   type="text"

@@ -132,6 +132,12 @@ export default function PdfViewer() {
   const pendingScrollRef = useRef<{ x: number; y: number } | null>(null);
   const pendingResetTransformRef = useRef(false);
   const scaleDisplayRef = useRef<HTMLSpanElement>(null);
+  
+  const pdfWrapperRef = useRef<HTMLDivElement>(null);
+  const [isQuickZoomed, setIsQuickZoomed] = useState(false);
+  const quickZoomOriginalRef = useRef<{ scale: number; zoomMode: "fit" | "custom" } | null>(null);
+  const lastClickRef = useRef<{ time: number; x: number; y: number } | null>(null);
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useLayoutEffect(() => {
     if (pendingResetTransformRef.current) {
@@ -252,38 +258,103 @@ export default function PdfViewer() {
     }
   };
 
-  // 컨테이너 클릭 (텍스트 선택 해제 및 좌우 엣지 탭 네비게이션)
+  const handleDoubleClick = (clientX: number, clientY: number) => {
+    if (!pdfWrapperRef.current || !containerRef.current) return;
+    
+    if (isQuickZoomed && quickZoomOriginalRef.current) {
+      const rect = pdfWrapperRef.current.getBoundingClientRect();
+      const docX = clientX - rect.left;
+      const docY = clientY - rect.top;
+      
+      const targetScale = quickZoomOriginalRef.current.scale;
+      const ratio = targetScale / currentScale;
+      
+      setIsQuickZoomed(false);
+      setZoomMode(quickZoomOriginalRef.current.zoomMode);
+      setCustomScale(targetScale);
+      
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const newDocY = docY * ratio;
+      
+      if (quickZoomOriginalRef.current.zoomMode === "fit") {
+        pendingScrollRef.current = { x: 0, y: newDocY + containerRect.top + 16 - clientY };
+      } else {
+        const newDocX = docX * ratio;
+        pendingScrollRef.current = {
+          x: newDocX + containerRect.left + 16 - clientX,
+          y: newDocY + containerRect.top + 16 - clientY
+        };
+      }
+      pendingResetTransformRef.current = true;
+    } else {
+      const rect = pdfWrapperRef.current.getBoundingClientRect();
+      const docX = clientX - rect.left;
+      const docY = clientY - rect.top;
+      
+      const targetScale = Math.min(currentScale * 2, 8.0);
+      const ratio = targetScale / currentScale;
+      
+      const newDocX = docX * ratio;
+      const newDocY = docY * ratio;
+      
+      quickZoomOriginalRef.current = { scale: customScale, zoomMode };
+      setIsQuickZoomed(true);
+      
+      setZoomMode("custom");
+      setCustomScale(targetScale);
+      
+      const containerRect = containerRef.current.getBoundingClientRect();
+      pendingScrollRef.current = {
+        x: newDocX + containerRect.left + 16 - clientX,
+        y: newDocY + containerRect.top + 16 - clientY
+      };
+      pendingResetTransformRef.current = true;
+    }
+  };
+
   const handleContainerClick = (e: React.MouseEvent) => {
-    // 1. 텍스트가 선택되어 있는 상태라면 네비게이션 무시
     const selection = window.getSelection();
     if (selection && selection.toString().trim().length > 0) {
-      // 텍스트 바깥 영역 클릭 시에만 선택 해제
       if (e.target === e.currentTarget) {
         handleCleanupSelection();
       }
       return;
     }
-
-    // 2. 단일 페이지 + Fit 모드일 때만 좌/우 엣지 클릭 네비게이션 허용 (확대 상태에서는 패닝 동작 보호)
-    if (viewMode === "single" && zoomMode === "fit" && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const width = rect.width;
-      
-      // 왼쪽 20% 클릭 시 이전 페이지, 오른쪽 20% 클릭 시 다음 페이지
-      if (clickX < width * 0.2) {
-        if (pageNumber > 1) previousPage();
-        return; // 네비게이션 수행 후 종료
-      } else if (clickX > width * 0.8) {
-        if (pageNumber < numPages) nextPage();
-        return; // 네비게이션 수행 후 종료
-      }
-    }
-
-    // 3. 그 외 빈 배경 영역 클릭 시 클린업
+    
     if (e.target === e.currentTarget) {
       handleCleanupSelection();
     }
+    if (tooltipPos) {
+      setTooltipPos(null);
+    }
+
+    const now = Date.now();
+    if (lastClickRef.current && now - lastClickRef.current.time < 300) {
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current);
+        clickTimeoutRef.current = null;
+      }
+      lastClickRef.current = null;
+      handleDoubleClick(e.clientX, e.clientY);
+      return;
+    }
+
+    lastClickRef.current = { time: now, x: e.clientX, y: e.clientY };
+
+    clickTimeoutRef.current = setTimeout(() => {
+      clickTimeoutRef.current = null;
+      if (viewMode === "single" && zoomMode === "fit" && containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const width = rect.width;
+        
+        if (clickX < width * 0.2) {
+          if (pageNumber > 1) previousPage();
+        } else if (clickX > width * 0.8) {
+          if (pageNumber < numPages) nextPage();
+        }
+      }
+    }, 300);
   };
 
   // 페이지 변경 시 클린업
@@ -295,6 +366,7 @@ export default function PdfViewer() {
   const nextPage = () => changePage(1);
   
   const handleToggleViewMode = () => {
+    setIsQuickZoomed(false);
     const nextMode = viewMode === "single" ? "continuous" : "single";
     toggleViewMode();
     transformRef.current?.resetTransform(0);
@@ -380,6 +452,7 @@ export default function PdfViewer() {
         }
       }}
       onZoomStop={(ref) => {
+        setIsQuickZoomed(false);
         const cssScale = ref.state.scale;
         const posX = ref.state.positionX;
         const posY = ref.state.positionY;
@@ -414,6 +487,7 @@ export default function PdfViewer() {
         }
       }}
       onPinchStop={(ref) => {
+        setIsQuickZoomed(false);
         const cssScale = ref.state.scale;
         const posX = ref.state.positionX;
         const posY = ref.state.positionY;
@@ -451,6 +525,7 @@ export default function PdfViewer() {
         const displayedScale = zoomMode === "fit" ? fitScale : customScale;
         
         const handleZoomIn = () => {
+          setIsQuickZoomed(false);
           const perceived = displayedScale * state.scale;
           const currentPct = perceived * 100;
           let step = 5;
@@ -465,6 +540,7 @@ export default function PdfViewer() {
         };
 
         const handleZoomOut = () => {
+          setIsQuickZoomed(false);
           const perceived = displayedScale * state.scale;
           const currentPct = perceived * 100;
           let step = 5;
@@ -479,6 +555,7 @@ export default function PdfViewer() {
         };
 
         const handleFit = () => {
+          setIsQuickZoomed(false);
           setZoomMode("fit");
           transformRef.current?.resetTransform(0);
         };
@@ -651,9 +728,10 @@ export default function PdfViewer() {
             wrapperClass={`!touch-${zoomMode === "fit" ? "pan-y" : "auto"}`}
             wrapperStyle={{ width: "100%", height: "auto", overflow: "visible", touchAction: zoomMode === "fit" ? "pan-y" : "auto", userSelect: "text" }} 
             contentStyle={{ minWidth: "100%", width: "auto", display: "flex", flexDirection: "column", alignItems: zoomMode === "fit" ? "center" : "flex-start", userSelect: "text" }}
-          >
-            <div 
-              onMouseDown={(e) => e.stopPropagation()} 
+            >
+              <div 
+                ref={pdfWrapperRef}
+                onMouseDown={(e) => e.stopPropagation()} 
               onTouchStart={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
               onTouchMove={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
               className={`w-full flex flex-col ${zoomMode === "fit" ? "items-center" : "items-start"}`}

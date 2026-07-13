@@ -26,7 +26,7 @@ export default function BottomNavBar() {
       </button>
 
       <button
-        onClick={() => setBottomSheetTab("ai")}
+        onClick={() => setBottomSheetTab(bottomSheetTab === "ai" ? "none" : "ai")}
         className={`flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors ${
           bottomSheetTab === "ai" ? "text-primary" : "text-on-surface-variant hover:text-on-surface"
         }`}
@@ -36,7 +36,7 @@ export default function BottomNavBar() {
       </button>
 
       <button
-        onClick={() => setBottomSheetTab("memo")}
+        onClick={() => setBottomSheetTab(bottomSheetTab === "memo" ? "none" : "memo")}
         className={`flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors ${
           bottomSheetTab === "memo" ? "text-primary" : "text-on-surface-variant hover:text-on-surface"
         }`}
