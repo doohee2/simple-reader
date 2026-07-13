@@ -71,7 +71,7 @@ const LazyPage = React.memo(({
   const expectedHeight = expectedWidth * 1.414;
 
   return (
-    <div id={`page-${pageNumber}`} ref={ref} className={`mb-4 flex ${zoomMode === "fit" ? "justify-center" : "justify-start"} min-h-[600px] w-full relative`}>
+    <div id={`page-${pageNumber}`} ref={ref} className="mb-4 relative mx-auto w-max min-h-[600px]">
       {isRendered ? (
         <div className="shadow-xl bg-white transition-transform origin-top">
           <Page
@@ -158,9 +158,18 @@ export default function PdfViewer() {
       let minDistance = Infinity;
       for (const page of pages) {
         const rect = page.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-        const distance = Math.sqrt(Math.pow(centerX - clientX, 2) + Math.pow(centerY - clientY, 2));
+        
+        // 1순위: Y좌표가 해당 페이지 영역 안에 포함되는지 확인
+        if (clientY >= rect.top && clientY <= rect.bottom) {
+          closestPage = page;
+          break;
+        }
+        
+        // 2순위: 가장 가까운 거리 (gap 영역 핀치 대비)
+        let distance = 0;
+        if (clientY < rect.top) distance = rect.top - clientY;
+        else if (clientY > rect.bottom) distance = clientY - rect.bottom;
+        
         if (distance < minDistance) {
           minDistance = distance;
           closestPage = page;
@@ -759,24 +768,24 @@ export default function PdfViewer() {
         {!isLoading && downloadState === "success" && fileData && (
           <TransformComponent 
             wrapperStyle={{ width: "100%", height: "auto", overflow: "visible", touchAction: zoomMode === "fit" ? "pan-y" : "auto", userSelect: "text" }} 
-            contentStyle={{ minWidth: "100%", width: "auto", display: "flex", flexDirection: "column", alignItems: zoomMode === "fit" ? "center" : "flex-start", userSelect: "text" }}
+            contentStyle={{ minWidth: "100%", width: "auto", display: "flex", flexDirection: "column", alignItems: "flex-start", userSelect: "text" }}
           >
             <div 
               ref={pdfWrapperRef}
               onMouseDown={(e) => e.stopPropagation()} 
               onTouchStart={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
               onTouchMove={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
-              className={`w-full flex flex-col ${zoomMode === "fit" ? "items-center" : "items-start"} p-4`}
+              className="w-full flex flex-col items-start p-4"
             >
               <Document
                 file={fileData}
                 onLoadSuccess={onDocumentLoadSuccess}
                 loading={<Loader2 size={40} className="animate-spin text-primary m-10" />}
                 error={<div className="p-4 text-error">문서를 렌더링할 수 없습니다.</div>}
-                className={`w-full flex flex-col ${zoomMode === "fit" ? "items-center" : "items-start"} pdf-document`}
+                className="w-full flex flex-col items-start pdf-document"
               >
                 {viewMode === "single" ? (
-                  <div id={`page-${pageNumber}`} className="shadow-2xl bg-white transition-transform origin-top">
+                  <div id={`page-${pageNumber}`} className="shadow-2xl bg-white transition-transform origin-top mx-auto w-max">
                     <Page
                       pageNumber={pageNumber}
                       width={zoomMode === "fit" ? (containerWidth ? containerWidth - 32 : undefined) : undefined}
