@@ -546,8 +546,8 @@ export default function PdfViewer() {
     <TransformWrapper
       ref={transformRef}
       initialScale={1}
-      minScale={0.25 / currentScale}
-      maxScale={8.0 / currentScale}
+      minScale={0.1}
+      maxScale={10.0}
       panning={{ 
         disabled: true, 
       }}
