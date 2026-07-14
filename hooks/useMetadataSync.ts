@@ -99,7 +99,8 @@ export function useMetadataSync(fileId: string | null) {
                 selectedText: serverItem.selected_text,
                 content: serverItem.content,
                 updatedAt: serverItem.updated_at,
-                deletedAt: serverItem.deleted_at || undefined
+                deletedAt: serverItem.deleted_at || undefined,
+                isUnsynced: false
               });
             }
           }
@@ -117,7 +118,8 @@ export function useMetadataSync(fileId: string | null) {
               selectedText: serverItem.selected_text,
               content: serverItem.content,
               updatedAt: serverItem.updated_at,
-              deletedAt: serverItem.deleted_at || undefined
+              deletedAt: serverItem.deleted_at || undefined,
+              isUnsynced: false
             });
           }
         });
@@ -142,6 +144,10 @@ export function useMetadataSync(fileId: string | null) {
           const { error: upsertError } = await supabase.from("pdf_metadata").upsert(upsertData);
           if (upsertError) {
             console.error("Supabase 일괄 업로드 실패:", upsertError);
+          } else {
+            // 업로드 성공 시 로컬의 isUnsynced 플래그 제거
+            const updatedLocals = localNeedsUpload.map(item => ({ ...item, isUnsynced: false }));
+            await db.pdfMetadata.bulkPut(updatedLocals);
           }
         }
 
@@ -173,8 +179,8 @@ export function useMetadataSync(fileId: string | null) {
     selectedText: string,
     content: string
   ) => {
-    if (!fileId || !userId) {
-      alert("로그인이 필요하거나 파일이 선택되지 않았습니다.");
+    if (!fileId) {
+      alert("파일이 선택되지 않았습니다.");
       return;
     }
 
@@ -189,58 +195,68 @@ export function useMetadataSync(fileId: string | null) {
       selectedText,
       content,
       updatedAt: new Date().toISOString(),
+      isUnsynced: !userId, // 비로그인 시 로컬 비동기 플래그 적용
     };
 
     // 로컬 즉시 저장
     await db.pdfMetadata.put(newMeta);
 
-    // 백그라운드 서버 동기화
-    try {
-      const { error } = await supabase.from("pdf_metadata").upsert({
-        id: newMeta.id,
-        user_id: userId,
-        file_id: newMeta.fileId,
-        page: newMeta.page,
-        type: newMeta.type,
-        selected_text: newMeta.selectedText,
-        content: newMeta.content,
-        updated_at: newMeta.updatedAt,
-      });
+    // 로그인 상태일 때만 백그라운드 서버 동기화 시도
+    if (userId) {
+      try {
+        const { error } = await supabase.from("pdf_metadata").upsert({
+          id: newMeta.id,
+          user_id: userId,
+          file_id: newMeta.fileId,
+          page: newMeta.page,
+          type: newMeta.type,
+          selected_text: newMeta.selectedText,
+          content: newMeta.content,
+          updated_at: newMeta.updatedAt,
+        });
 
-      if (error) {
-        console.error("Supabase 백업 실패 (로컬에는 저장됨):", error);
+        if (error) {
+          console.error("Supabase 백업 실패 (로컬에는 저장됨):", error);
+        } else {
+          newMeta.isUnsynced = false;
+          await db.pdfMetadata.put(newMeta);
+        }
+      } catch (err) {
+        console.error("네트워크 오류 (로컬에는 저장됨):", err);
       }
-    } catch (err) {
-      console.error("네트워크 오류 (로컬에는 저장됨):", err);
     }
   };
   
   // 4. 메타데이터 업데이트 (수정)
   const updateMetadata = async (id: string, newContent: string) => {
-    if (!userId) return;
-    
     // 로컬 즉시 업데이트
     const item = await db.pdfMetadata.get(id);
     if (item) {
       item.content = newContent;
       item.updatedAt = new Date().toISOString();
+      item.isUnsynced = !userId;
       await db.pdfMetadata.put(item);
     }
 
-    // 백그라운드 서버 동기화
-    try {
-      await supabase.from("pdf_metadata")
-        .update({ content: newContent, updated_at: new Date().toISOString() })
-        .eq("id", id).eq("user_id", userId);
-    } catch (err) {
-      console.error("Supabase 업데이트 동기화 실패:", err);
+    if (userId) {
+      // 백그라운드 서버 동기화
+      try {
+        const { error } = await supabase.from("pdf_metadata")
+          .update({ content: newContent, updated_at: new Date().toISOString() })
+          .eq("id", id).eq("user_id", userId);
+          
+        if (!error && item) {
+          item.isUnsynced = false;
+          await db.pdfMetadata.put(item);
+        }
+      } catch (err) {
+        console.error("Supabase 업데이트 동기화 실패:", err);
+      }
     }
   };
 
   // 5. 메타데이터 삭제 (Soft Delete)
   const deleteMetadata = async (id: string) => {
-    if (!userId) return;
-    
     const now = new Date().toISOString();
 
     // 로컬 Soft Delete 처리 (실제 삭제 대신 deletedAt 기록)
@@ -248,16 +264,24 @@ export function useMetadataSync(fileId: string | null) {
     if (item) {
       item.deletedAt = now;
       item.updatedAt = now;
+      item.isUnsynced = !userId;
       await db.pdfMetadata.put(item);
     }
 
-    // 백그라운드 서버 동기화 (업데이트)
-    try {
-      await supabase.from("pdf_metadata")
-        .update({ deleted_at: now, updated_at: now })
-        .eq("id", id).eq("user_id", userId);
-    } catch (err) {
-      console.error("Supabase 삭제 동기화 실패:", err);
+    if (userId) {
+      // 백그라운드 서버 동기화 (업데이트)
+      try {
+        const { error } = await supabase.from("pdf_metadata")
+          .update({ deleted_at: now, updated_at: now })
+          .eq("id", id).eq("user_id", userId);
+          
+        if (!error && item) {
+          item.isUnsynced = false;
+          await db.pdfMetadata.put(item);
+        }
+      } catch (err) {
+        console.error("Supabase 삭제 동기화 실패:", err);
+      }
     }
   };
 

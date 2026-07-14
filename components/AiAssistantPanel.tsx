@@ -347,6 +347,11 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
                         {meta.type === "memo" ? "MEMO" : "BOOKMARK"}
                       </span>
                       <span className="text-on-surface-variant text-xs">Page {meta.page}</span>
+                      {meta.isUnsynced && (
+                        <span className="text-[10px] text-secondary flex items-center gap-0.5 ml-1" title="동기화 대기중 (로컬에만 저장됨)">
+                          <span className="material-symbols-outlined text-[14px]">cloud_sync</span>
+                        </span>
+                      )}
                     </div>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       {editingId !== meta.id && (

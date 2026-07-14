@@ -20,6 +20,7 @@ export interface PdfMetadata {
   content: string;
   updatedAt: string;
   deletedAt?: string;
+  isUnsynced?: boolean;
 }
 
 const db = new Dexie('SimpleReaderDB') as Dexie & {

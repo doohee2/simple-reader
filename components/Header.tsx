@@ -84,54 +84,51 @@ export default function Header() {
             <span className={iconClass}>{theme === "dark" ? "light_mode" : "dark_mode"}</span>
           </button>
 
+          {/* 공통 기능: 내 서재 */}
+          <button
+            onClick={() => setIsStorageManagerOpen(true)}
+            className={iconButtonClass}
+            title="내 서재"
+          >
+            <Library className="w-[22px] h-[22px] md:w-[24px] md:h-[24px]" strokeWidth={2} />
+          </button>
+
+          {/* 공통 기능: 파일 닫기 / 열기 */}
+          {selectedFileName ? (
+            <button 
+              onClick={() => setSelectedFile(null, null, null)}
+              className={iconButtonClass}
+              title="파일 닫기"
+            >
+              <span className={iconClass}>close</span>
+            </button>
+          ) : (
+            <button 
+              onClick={() => status === "authenticated" ? setIsDrivePickerOpen(true) : signIn("google")}
+              className={iconButtonClass}
+              title="드라이브 파일 열기"
+            >
+              <span className={iconClass}>folder_open</span>
+            </button>
+          )}
+
           {/* 인증 상태에 따른 버튼들 */}
           {status === "authenticated" ? (
-            <>
-              {/* 내 서재 버튼 */}
-              <button
-                onClick={() => setIsStorageManagerOpen(true)}
-                className={iconButtonClass}
-                title="내 서재"
-              >
-                <Library className="w-[22px] h-[22px] md:w-[24px] md:h-[24px]" strokeWidth={2} />
-              </button>
-
-              {/* 파일 닫기 / 열기 */}
-              {selectedFileName ? (
-                <button 
-                  onClick={() => setSelectedFile(null, null, null)}
-                  className={iconButtonClass}
-                  title="파일 닫기"
-                >
-                  <span className={iconClass}>close</span>
-                </button>
+            <button 
+              onClick={() => signOut()}
+              className={`${iconButtonClass} p-0 border-2 border-transparent hover:border-primary group relative`}
+              title="로그아웃"
+            >
+              {session.user?.image ? (
+                <img src={session.user.image} alt="Profile" className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover" />
               ) : (
-                <button 
-                  onClick={() => setIsDrivePickerOpen(true)}
-                  className={iconButtonClass}
-                  title="드라이브 파일 열기"
-                >
-                  <span className={iconClass}>folder_open</span>
-                </button>
+                <span className={iconClass}>account_circle</span>
               )}
-              
-              {/* 로그아웃 / 프로필 */}
-              <button 
-                onClick={() => signOut()}
-                className={`${iconButtonClass} p-0 border-2 border-transparent hover:border-primary group relative`}
-                title="로그아웃"
-              >
-                {session.user?.image ? (
-                  <img src={session.user.image} alt="Profile" className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover" />
-                ) : (
-                  <span className={iconClass}>account_circle</span>
-                )}
-                {/* 툴팁 (마우스 호버시 로그아웃) */}
-                <div className="absolute hidden md:group-hover:block top-10 right-0 bg-surface-bright p-2 rounded shadow-lg text-xs whitespace-nowrap z-50">
-                  로그아웃
-                </div>
-              </button>
-            </>
+              {/* 툴팁 (마우스 호버시 로그아웃) */}
+              <div className="absolute hidden md:group-hover:block top-10 right-0 bg-surface-bright p-2 rounded shadow-lg text-xs whitespace-nowrap z-50">
+                로그아웃
+              </div>
+            </button>
           ) : (
             /* 비로그인 상태 */
             <button 

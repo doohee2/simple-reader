@@ -784,9 +784,15 @@ export default function PdfViewer() {
               </div>
               <button 
                 onClick={handleToggleBookmark}
-                className={`p-1.5 rounded transition-colors ${isBookmarked ? 'text-primary bg-primary/10 hover:bg-primary/20' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-variant'}`}
+                className={`relative p-1.5 rounded transition-colors ${isBookmarked ? 'text-primary bg-primary/10 hover:bg-primary/20' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-variant'}`}
+                title={existingBookmark?.isUnsynced ? "동기화 대기중 (로컬에만 저장됨)" : "책갈피"}
               >
                 <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: isBookmarked ? "'FILL' 1" : "'FILL' 0" }}>bookmark</span>
+                {existingBookmark?.isUnsynced && (
+                  <span className="absolute -top-1 -right-1 text-secondary bg-surface rounded-full flex items-center justify-center">
+                    <span className="material-symbols-outlined text-[14px]">cloud_sync</span>
+                  </span>
+                )}
               </button>
             </div>
           </div>
