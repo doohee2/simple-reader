@@ -129,7 +129,7 @@ export default function PdfViewer() {
   
   const pdfWrapperRef = useRef<HTMLDivElement>(null);
   const [isQuickZoomed, setIsQuickZoomed] = useState(false);
-  const [pinchSpikeThreshold, setPinchSpikeThreshold] = useState<number>(10);
+  const [pinchSpikeThreshold, setPinchSpikeThreshold] = useState<number>(50);
   const [showThresholdModal, setShowThresholdModal] = useState(false);
   const [isDebugMode, setIsDebugMode] = useState(false);
   const [debugInfo, setDebugInfo] = useState({ event: "", scale: 0, posX: 0, posY: 0, anchorX: 0, anchorY: 0, msg: "" });
@@ -404,7 +404,7 @@ export default function PdfViewer() {
       setIsQuickZoomed(false);
       applyZoomWithAnchor(targetScale, quickZoomOriginalRef.current.zoomMode, clientX, clientY);
     } else {
-      const targetScale = Math.min(currentScale * 2, 8.0);
+      const targetScale = Math.min(currentScale * 2, 5.0);
       const scaleToSave = zoomMode === "fit" ? stateRef.current.fitScale : customScale;
       quickZoomOriginalRef.current = { scale: scaleToSave, zoomMode };
       setIsQuickZoomed(true);
@@ -593,7 +593,7 @@ export default function PdfViewer() {
       return;
     }
     
-    const targetScale = Math.min(Math.max(currentScale * libScale, 0.25), 8.0);
+    const targetScale = Math.min(Math.max(currentScale * libScale, 0.5), 5.0);
     
     const anchor = pinchCenterRef.current;
     pinchCenterRef.current = null;
@@ -609,8 +609,8 @@ export default function PdfViewer() {
     <TransformWrapper
       ref={transformRef}
       initialScale={1}
-      minScale={0.1}
-      maxScale={10.0}
+      minScale={Math.max(0.1, 0.5 / currentScale)}
+      maxScale={Math.min(10.0, 5.0 / currentScale)}
       panning={{ 
         disabled: true, 
       }}
@@ -621,7 +621,7 @@ export default function PdfViewer() {
         if (scaleDisplayRef.current) {
           const { currentScale } = stateRef.current;
           const perceived = currentScale * state.scale;
-          const bounded = Math.min(Math.max(0.25, perceived), 8.0);
+          const bounded = Math.min(Math.max(0.5, perceived), 5.0);
           scaleDisplayRef.current.innerText = `${Math.round(bounded * 100)}%`;
         }
       }}
@@ -678,7 +678,7 @@ export default function PdfViewer() {
           else if (currentPct >= 130) step = 10;
           
           const nextPct = Math.ceil((currentPct + 1) / step) * step;
-          const newScale = Math.min(nextPct / 100, 8.0);
+          const newScale = Math.min(nextPct / 100, 5.0);
           
           applyZoomWithAnchor(newScale, "custom");
         };
@@ -693,7 +693,7 @@ export default function PdfViewer() {
           else if (currentPct > 130) step = 10;
           
           const nextPct = Math.floor((currentPct - 1) / step) * step;
-          const newScale = Math.max(nextPct / 100, 0.25);
+          const newScale = Math.max(nextPct / 100, 0.5);
           
           applyZoomWithAnchor(newScale, "custom");
         };
