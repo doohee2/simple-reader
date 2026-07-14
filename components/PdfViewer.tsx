@@ -231,8 +231,6 @@ export default function PdfViewer() {
     transformRef.current?.setTransform(0, 0, 1, 0);
   }, []);
 
-  }, [customScale, zoomMode]);
-
   useLayoutEffect(() => {
     if (scaleDisplayRef.current) {
       const fitScale = (containerWidth && pageBaseWidth) ? (containerWidth - 32) / pageBaseWidth : 1;
