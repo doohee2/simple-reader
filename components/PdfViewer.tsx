@@ -196,16 +196,14 @@ export default function PdfViewer() {
     const ratioX = (clientX - initialPageRect.left) / initialPageRect.width;
     const ratioY = (clientY - initialPageRect.top) / initialPageRect.height;
     
-    // 3. Clear transform to prevent visual flicker
+    // 3. Clear transform to prevent visual flicker and reset library state
     const transformComponent = document.querySelector('.react-transform-component') as HTMLElement;
     if (transformComponent) {
       transformComponent.style.transform = "";
     }
     
-    // 강제로 내부 스케일을 1로 초기화하여 다음 렌더링 시 CSS Transform이 잔류하는 버그 방지
-    if (transformRef.current?.instance) {
-      transformRef.current.instance.state.scale = 1;
-    }
+    // 강제로 내부 스케일을 1로 초기화 (flushSync로 인해 React가 리렌더링되기 전에 수행해야 부수효과 없음)
+    transformRef.current?.setTransform(0, 0, 1, 0);
     
     // 4. Synchronously update React state and DOM
     flushSync(() => {
@@ -226,9 +224,6 @@ export default function PdfViewer() {
     
     // 6. Debug info sync
     setDebugInfo(prev => prev.event === "onPinchStop" ? { ...prev, msg: `scrollLeft: ${Math.round(container.scrollLeft)}, scrollTop: ${Math.round(container.scrollTop)}` } : prev);
-    
-    // 7. Synchronize react-zoom-pan-pinch internal state (resetTransform 대신 setTransform 사용하여 bounds 제약 무시하고 강제 초기화)
-    transformRef.current?.setTransform(0, 0, 1, 0);
   }, []);
 
   useLayoutEffect(() => {
@@ -451,7 +446,7 @@ export default function PdfViewer() {
     setIsQuickZoomed(false);
     const nextMode = viewMode === "single" ? "continuous" : "single";
     toggleViewMode();
-    transformRef.current?.resetTransform(0);
+    transformRef.current?.setTransform(0, 0, 1, 0);
     
     if (nextMode === "continuous") {
       scrollToPage(pageNumber, true, 0);
