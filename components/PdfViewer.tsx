@@ -146,6 +146,13 @@ export default function PdfViewer() {
   
   const stateRef = useRef<{ currentScale: number; zoomMode: "fit" | "custom"; customScale: number; fitScale: number }>({ currentScale: 1, zoomMode: "fit", customScale: 1, fitScale: 1 });
 
+  // ArrayBuffer detachment 방지용 래퍼: PDF.js 워커가 버퍼를 앗아가는(transfer) 것을 막기 위해
+  // React 18의 Strict Mode나 리렌더링 시 빈 버퍼 에러(Cannot read properties of null (reading 'sendWithPromise'))를 예방합니다.
+  const documentFile = useMemo(() => {
+    if (!fileData) return null;
+    return { data: fileData.slice(0) };
+  }, [fileData]);
+
   const applyZoomWithAnchor = useCallback((targetScale: number, newZoomMode: "fit" | "custom", anchorClientX?: number, anchorClientY?: number) => {
     if (!containerRef.current) return;
     const container = containerRef.current;
@@ -887,7 +894,7 @@ export default function PdfViewer() {
           </div>
         )}
 
-        {!isLoading && downloadState === "success" && fileData && (
+        {!isLoading && downloadState === "success" && documentFile && (
           <TransformComponent 
             wrapperStyle={{ width: "100%", height: "auto", overflow: "visible", touchAction: zoomMode === "fit" ? "pan-y" : "auto", userSelect: "text" }} 
             contentStyle={{ minWidth: "100%", width: "auto", display: "flex", flexDirection: "column", alignItems: "flex-start", userSelect: "text" }}
@@ -900,7 +907,7 @@ export default function PdfViewer() {
               className="w-full flex flex-col items-start p-4"
             >
               <Document
-                file={fileData}
+                file={documentFile}
                 onLoadSuccess={onDocumentLoadSuccess}
                 loading={<Loader2 size={40} className="animate-spin text-primary m-10" />}
                 error={<div className="p-4 text-error">문서를 렌더링할 수 없습니다.</div>}
