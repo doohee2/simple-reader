@@ -196,13 +196,33 @@ export default function PdfViewer() {
     const ratioX = (clientX - initialPageRect.left) / initialPageRect.width;
     const ratioY = (clientY - initialPageRect.top) / initialPageRect.height;
     
-    // 3. Clear transform to prevent visual flicker and reset library state
+    // 3. 라이브러리 내부 잔여 애니메이션(RAF) 강제 취소
+    // handlePinchStop 내부에서 handleAlignToScaleBounds → handleAlignToBounds → animate() 가
+    // 비동기 RAF 애니메이션을 시작할 수 있음. 이 애니메이션이 다음 프레임에서
+    // state.scale 을 이전 값(1.1)으로 다시 덮어쓰는 것이 double-scaling 의 근본 원인.
+    const instance = transformRef.current?.instance;
+    if (instance) {
+      // cancelAnimationFrame 으로 진행 중인 RAF 중단
+      if (typeof instance.animation === "number") {
+        cancelAnimationFrame(instance.animation);
+      }
+      instance.animation = null;
+      instance.isAnimating = false;
+      instance.velocity = null;
+      
+      // 내부 상태를 직접 1.0 으로 강제 설정
+      instance.state.scale = 1;
+      instance.state.positionX = 0;
+      instance.state.positionY = 0;
+    }
+    
+    // CSS transform 제거 (시각적 깜빡임 방지)
     const transformComponent = document.querySelector('.react-transform-component') as HTMLElement;
     if (transformComponent) {
       transformComponent.style.transform = "";
     }
     
-    // 강제로 내부 스케일을 1로 초기화 (flushSync로 인해 React가 리렌더링되기 전에 수행해야 부수효과 없음)
+    // 공식 API 로도 한번 더 초기화 (onTransform 콜백 등 정상 동기화)
     transformRef.current?.setTransform(0, 0, 1, 0);
     
     // 4. Synchronously update React state and DOM
@@ -210,6 +230,21 @@ export default function PdfViewer() {
       setCustomScale(targetScale);
       setZoomMode(newZoomMode);
     });
+    
+    // 5. flushSync 후 혹시 라이브러리가 리렌더링 중 다시 애니메이션을 걸었을 경우 한번 더 취소
+    if (instance) {
+      if (typeof instance.animation === "number") {
+        cancelAnimationFrame(instance.animation);
+      }
+      instance.animation = null;
+      instance.isAnimating = false;
+      instance.state.scale = 1;
+      instance.state.positionX = 0;
+      instance.state.positionY = 0;
+      if (transformComponent) {
+        transformComponent.style.transform = "";
+      }
+    }
     
     // 5. Calculate new scroll positions to restore the anchor point
     const newPageRect = anchorPageEl.getBoundingClientRect();
