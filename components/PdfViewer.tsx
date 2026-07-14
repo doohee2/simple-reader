@@ -202,6 +202,11 @@ export default function PdfViewer() {
       transformComponent.style.transform = "";
     }
     
+    // 강제로 내부 스케일을 1로 초기화하여 다음 렌더링 시 CSS Transform이 잔류하는 버그 방지
+    if (transformRef.current?.instance) {
+      transformRef.current.instance.state.scale = 1;
+    }
+    
     // 4. Synchronously update React state and DOM
     flushSync(() => {
       setCustomScale(targetScale);
@@ -222,8 +227,8 @@ export default function PdfViewer() {
     // 6. Debug info sync
     setDebugInfo(prev => prev.event === "onPinchStop" ? { ...prev, msg: `scrollLeft: ${Math.round(container.scrollLeft)}, scrollTop: ${Math.round(container.scrollTop)}` } : prev);
     
-    // 7. Synchronize react-zoom-pan-pinch internal state
-    transformRef.current?.resetTransform(0);
+    // 7. Synchronize react-zoom-pan-pinch internal state (resetTransform 대신 setTransform 사용하여 bounds 제약 무시하고 강제 초기화)
+    transformRef.current?.setTransform(0, 0, 1, 0);
   }, []);
 
   useLayoutEffect(() => {
@@ -522,7 +527,7 @@ export default function PdfViewer() {
     lastGoodPinchStateRef.current = null;
     
     if (!lastGood) {
-      transformRef.current?.resetTransform(0);
+      transformRef.current?.setTransform(0, 0, 1, 0);
       return;
     }
     
@@ -530,7 +535,7 @@ export default function PdfViewer() {
     const currentScale = stateRef.current.currentScale;
     
     if (Math.abs(libScale - 1) < 0.05) {
-      transformRef.current?.resetTransform(0);
+      transformRef.current?.setTransform(0, 0, 1, 0);
       return;
     }
     
@@ -642,12 +647,16 @@ export default function PdfViewer() {
             transformComponent.style.transform = "";
           }
           
+          if (transformRef.current?.instance) {
+             transformRef.current.instance.state.scale = 1;
+          }
+          
           flushSync(() => {
             setZoomMode("fit");
             setCustomScale(fitScale);
           });
           
-          transformRef.current?.resetTransform(0);
+          transformRef.current?.setTransform(0, 0, 1, 0);
           
           if (containerRef.current) {
             containerRef.current.scrollLeft = 0;
