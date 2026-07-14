@@ -82,11 +82,6 @@ const LazyPage = React.memo(({
             renderTextLayer={true}
             renderAnnotationLayer={true}
             className="pdf-page"
-            loading={
-              <div className="absolute inset-0 flex items-center justify-center bg-surface-container">
-                <Loader2 className="animate-spin text-primary" size={32} />
-              </div>
-            }
           />
         </div>
       ) : (
@@ -138,6 +133,7 @@ export default function PdfViewer() {
   const [showThresholdModal, setShowThresholdModal] = useState(false);
   const [isDebugMode, setIsDebugMode] = useState(false);
   const [debugInfo, setDebugInfo] = useState({ event: "", scale: 0, posX: 0, posY: 0, anchorX: 0, anchorY: 0, msg: "" });
+  const pinchHistoryRef = useRef<{scale: number, time: number}[]>([]);
   const quickZoomOriginalRef = useRef<{ scale: number; zoomMode: "fit" | "custom" } | null>(null);
   const lastClickRef = useRef<{ time: number; x: number; y: number } | null>(null);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -566,7 +562,30 @@ export default function PdfViewer() {
       return;
     }
     
-    const libScale = lastGood.scale;
+    // Calculate Smoothed Scale (Peak Scale)
+    const now = Date.now();
+    const recentHistory = pinchHistoryRef.current.filter(item => now - item.time < 300);
+    pinchHistoryRef.current = [];
+    
+    let libScale = lastGood.scale;
+    
+    if (recentHistory.length > 0) {
+      const scales = recentHistory.map(h => h.scale);
+      if (libScale > 1.0) {
+        // Zooming in: find the max scale in recent history to prevent dropping at the end
+        const maxRecent = Math.max(...scales);
+        if (maxRecent > libScale) {
+          libScale = maxRecent;
+        }
+      } else if (libScale < 1.0) {
+        // Zooming out: find the min scale in recent history
+        const minRecent = Math.min(...scales);
+        if (minRecent < libScale) {
+          libScale = minRecent;
+        }
+      }
+    }
+
     const currentScale = stateRef.current.currentScale;
     
     if (Math.abs(libScale - 1) < 0.05) {
@@ -627,6 +646,12 @@ export default function PdfViewer() {
           positionX: ref.state.positionX,
           positionY: ref.state.positionY,
         };
+
+        const now = Date.now();
+        pinchHistoryRef.current.push({ scale: ref.state.scale, time: now });
+        if (pinchHistoryRef.current.length > 20) {
+          pinchHistoryRef.current.shift();
+        }
         
         if (isDebugMode) {
           setDebugInfo({
