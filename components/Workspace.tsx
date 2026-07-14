@@ -86,7 +86,7 @@ export default function Workspace() {
   // 데스크탑 레이아웃 (좌우 분할)
   return (
     <main className="flex-1 flex overflow-hidden w-full">
-      <PanelGroup orientation="horizontal" id="workspace-layout">
+      <PanelGroup orientation="horizontal" id="workspace-layout" autoSave="workspace-layout">
         {/* Left Panel: Reader */}
         <Panel defaultSize={70} minSize={20}>
           <PdfViewer />

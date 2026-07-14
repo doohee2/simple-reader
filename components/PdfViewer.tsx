@@ -136,6 +136,7 @@ export default function PdfViewer() {
   const [isQuickZoomed, setIsQuickZoomed] = useState(false);
   const [pinchSpikeThreshold, setPinchSpikeThreshold] = useState<number>(10);
   const [showThresholdModal, setShowThresholdModal] = useState(false);
+  const [customScaleInput, setCustomScaleInput] = useState<string>("");
   const [isDebugMode, setIsDebugMode] = useState(false);
   const [debugInfo, setDebugInfo] = useState({ event: "", scale: 0, posX: 0, posY: 0, anchorX: 0, anchorY: 0, msg: "" });
   const quickZoomOriginalRef = useRef<{ scale: number; zoomMode: "fit" | "custom" } | null>(null);
@@ -230,6 +231,12 @@ export default function PdfViewer() {
     // 7. Synchronize react-zoom-pan-pinch internal state (resetTransform 대신 setTransform 사용하여 bounds 제약 무시하고 강제 초기화)
     transformRef.current?.setTransform(0, 0, 1, 0);
   }, []);
+
+  useEffect(() => {
+    if (showThresholdModal) {
+      setCustomScaleInput(Math.round(stateRef.current.currentScale * 100).toString());
+    }
+  }, [showThresholdModal, stateRef.current.currentScale]);
 
   useLayoutEffect(() => {
     // legacy pending updates removed, keeping only scale display update
@@ -918,6 +925,42 @@ export default function PdfViewer() {
                   className="flex-1 accent-primary"
                 />
                 <span className="text-ui-label-md text-primary w-8 text-right">{pinchSpikeThreshold}%</span>
+              </div>
+              
+              <div className="flex items-center gap-3 mb-4">
+                <span className="text-ui-body-sm text-on-surface w-20">직접 줌 (%):</span>
+                <input 
+                  type="number"
+                  value={customScaleInput}
+                  onChange={(e) => setCustomScaleInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const scale = parseInt(customScaleInput);
+                      if (!isNaN(scale) && scale > 0) {
+                        applyZoomWithAnchor(scale / 100, "custom");
+                        setShowThresholdModal(false);
+                      }
+                    }
+                  }}
+                  className="flex-1 bg-surface-dim border border-outline-variant rounded p-1.5 text-on-surface text-ui-body-sm"
+                />
+                <button 
+                  onClick={() => {
+                    const scale = parseInt(customScaleInput);
+                    if (!isNaN(scale) && scale > 0) {
+                      applyZoomWithAnchor(scale / 100, "custom");
+                      setShowThresholdModal(false);
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-surface-variant text-on-surface rounded text-ui-label-sm hover:bg-surface-variant-hover"
+                >
+                  적용
+                </button>
+              </div>
+              <div className="text-ui-body-xs text-on-surface-variant mb-6 bg-surface-dim p-2 rounded border border-outline-variant">
+                <div>currentScale: {stateRef.current.currentScale.toFixed(3)} ({Math.round(stateRef.current.currentScale * 100)}%)</div>
+                <div>customScale: {stateRef.current.customScale.toFixed(3)}</div>
+                <div>fitScale: {stateRef.current.fitScale.toFixed(3)}</div>
               </div>
               
               <div className="flex items-center gap-2 mb-6 bg-surface-dim p-3 rounded-lg border border-outline-variant">
