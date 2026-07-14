@@ -3,4 +3,4 @@ export const APP_INFO = {
   VERSION: "2026.7.12 by doohee2"
 };
 
-export const EMPTY_STATE_MESSAGE = "'내 서재' 또는 '드라이브 파일 열기'를 통해 PDF를 선택해 주세요. 구글 로그인이 필요합니다.";
+export const EMPTY_STATE_MESSAGE = "'내 서재' 또는 '드라이브 파일 열기'를 통해 PDF를 선택해 주세요.";

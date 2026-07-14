@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useCallback, useLayoutEffect } from "react";
+import React, { useEffect, useState, useRef, useCallback, useLayoutEffect, useMemo } from "react";
 import { flushSync } from "react-dom";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";

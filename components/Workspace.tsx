@@ -53,20 +53,7 @@ export default function Workspace() {
     );
   }
 
-  if (status === "unauthenticated") {
-    return (
-      <main className="flex-1 flex items-center justify-center bg-surface-container-lowest h-full w-full">
-        <div className="flex flex-col items-center gap-4 text-center max-w-md px-4">
-          <span className="material-symbols-outlined text-6xl text-primary/50">account_circle</span>
-          <h2 className="text-headline-md text-on-surface">로그인이 필요합니다</h2>
-          <p className="text-ui-body text-on-surface-variant">
-            상단의 <strong>Google 로그인</strong> 버튼을 눌러 이북 리더기를 시작해보세요. 
-            구글 드라이브와 자동으로 연동됩니다.
-          </p>
-        </div>
-      </main>
-    );
-  }
+
 
   if (isMobile) {
     return (
