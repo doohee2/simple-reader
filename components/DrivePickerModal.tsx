@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, FileText, Loader2, Folder, ArrowLeft, Library, Settings2, Pin } from "lucide-react";
+import { X, FileText, Loader2, Folder, Pin } from "lucide-react";
 
 interface DriveFile {
   id: string;

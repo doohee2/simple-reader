@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Library, Trash2, Database, FileText, CheckCircle2, Clock } from "lucide-react";
+import { X, Library, Trash2, FileText, CheckCircle2, Clock } from "lucide-react";
 import { getStorageStats, deletePdfCache, clearAllPdfCaches, StorageStat } from "@/lib/db";
 import db from "@/lib/db";
 import { useStore } from "@/store/useStore";

@@ -372,7 +372,7 @@ export default function PdfViewer() {
                   y: rect.top - containerRect.top + containerRef.current.scrollTop - 10
                 });
               }
-            } catch (e) {
+            } catch {
               // Range 오류 무시
             }
           }
@@ -428,6 +428,7 @@ export default function PdfViewer() {
     }
 
     // 2. 더블클릭 판정 (텍스트 선택 여부와 무관하게 작동)
+    // eslint-disable-next-line react-hooks/purity
     const now = Date.now();
     if (lastClickRef.current && now - lastClickRef.current.time < 300) {
       if (clickTimeoutRef.current) {
@@ -543,6 +544,7 @@ export default function PdfViewer() {
   const fitScale = (containerWidth && pageBaseWidth) ? (containerWidth - 32) / pageBaseWidth : 1;
   const currentScale = zoomMode === "fit" ? fitScale : customScale;
   
+  // eslint-disable-next-line react-hooks/refs
   stateRef.current = { currentScale, zoomMode, customScale, fitScale };
 
   // 핀치 줌 종료 핸들러 (오염된 ref.state 대신 lastGoodPinchStateRef 사용)

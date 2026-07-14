@@ -1,6 +1,6 @@
 "use client";
 
-import { UserCircle, LogOut, Library, X } from "lucide-react";
+import { Library, X } from "lucide-react";
 import { signIn, signOut, useSession } from "next-auth/react";
 import { useState } from "react";
 import DrivePickerModal from "./DrivePickerModal";

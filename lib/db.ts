@@ -31,7 +31,7 @@ const db = new Dexie('SimpleReaderDB') as Dexie & {
 db.version(3).stores({
   pdfCache: 'fileId', // Primary key is fileId
   pdfMetadata: 'id, fileId, type', // Primary key is id, indexed by fileId and type
-}).upgrade(tx => {
+}).upgrade(() => {
   // Version 2: Add fileName field to pdfCache
   // Version 3: Add deletedAt field to pdfMetadata (not indexed, so no stores string change)
 });

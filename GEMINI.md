@@ -130,6 +130,14 @@ simple-reader/
    - 모바일 환경(롱 프레스 후 핸들 드래그)에서는 `onMouseUp`이나 `onTouchEnd` 이벤트로 텍스트 선택 완료 시점을 정확히 잡을 수 없습니다. 
    - `document` 레벨에서 **`selectionchange`** 이벤트를 감지하되, 빈번한 이벤트 호출로 인한 성능 저하를 막기 위해 300ms 디바운스(Debounce)를 적용하여 사용자가 드래그를 끝마치는 순간 빠르고 정확하게 선택 영역을 AI 입력 패널로 전송합니다.
 
+6. **핀치 줌 중복 확대(Double-Scaling) 버그 해결 (RAF 비동기 애니메이션 제어)**
+   - **현상:** 110%로 핀치 줌을 시도했을 때, `react-pdf` 캔버스와 라이브러리의 CSS `transform` 배율이 이중으로 적용되어 화면이 121%로 증폭되는 문제 발생.
+   - **발생 원인 (Race Condition):** 
+     1) 라이브러리 내부 `handlePinchStop`이 실행되면서 `handleAlignToScaleBounds` 로직이 비동기 RAF(requestAnimationFrame) 애니메이션을 시작할 수 있음.
+     2) 이 직후 개발자 콜백 `onPinchStop`에서 `setTransform(0,0,1,0)`을 호출하여 라이브러리 스케일을 1.0으로 강제 리셋하고 `flushSync`를 통해 `react-pdf` 렌더링에 새 배율을 적용.
+     3) 하지만, 이전에 라이브러리가 시작해둔 **비동기 RAF 애니메이션이 다음 프레임에 실행되면서** 이전 스케일(1.1)을 라이브러리의 `state.scale`에 다시 덮어씀. 결과적으로 CSS Transform 스케일이 1.1로 롤백되어 이중 확대(Double-scaling) 현상 초래.
+   - **해결 로직:** `applyZoomWithAnchor` 내부에서 `setTransform`을 호출하기 직전에 `cancelAnimationFrame(instance.animation)`을 호출하여 라이브러리의 **진행 중인 모든 비동기 애니메이션을 강제 취소**하고, `instance.state`를 직접 `1.0`으로 덮어씀으로써 애니메이션에 의한 롤백 부수 효과를 완벽히 차단함.
+
 ### **메타데이터 하이브리드 동기화 (Hybrid Sync Engine) 구조 개선**
 다중 기기(PC/모바일) 환경에서 메모와 책갈피를 오차 없이 동기화하기 위해 다음과 같은 고도화된 아키텍처가 적용되었습니다.
 

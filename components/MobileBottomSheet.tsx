@@ -30,13 +30,15 @@ export default function MobileBottomSheet() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // 바텀 시트가 열릴 때 기본 높이 설정 (Peek 상태)
+  // 바텀 시트가 열릴 때 기본 높이 설정 (마지막으로 저장된 위치 로드)
   useEffect(() => {
     if (isOpen && height === 0 && windowHeight > 0) {
+      const savedRatio = localStorage.getItem("bottomSheetHeightRatio");
+      const ratio = savedRatio ? parseFloat(savedRatio) : 0.4;
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setHeight(windowHeight * 0.4); // 기본 40% 높이
+      setHeight(windowHeight * Math.min(Math.max(ratio, 0.2), 0.9));
     } else if (!isOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setHeight(0); // 닫히면 높이 0
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -54,16 +56,9 @@ export default function MobileBottomSheet() {
     const deltaY = dragStartY.current - clientY;
     const newHeight = dragStartHeight.current + deltaY;
     
-    // 최대 화면의 90%, 최소 100px로 제한
+    // 최대 화면의 90%, 최소 0px로 제한
     const maxHeight = windowHeight * 0.9;
-    if (newHeight > maxHeight) {
-      setHeight(maxHeight);
-    } else if (newHeight < 100) {
-      // 100px보다 작아지면 닫기 의도로 간주할 수 있지만, move 중에는 일단 높이만 줄임
-      setHeight(newHeight);
-    } else {
-      setHeight(newHeight);
-    }
+    setHeight(Math.max(0, Math.min(newHeight, maxHeight)));
   };
 
   const handleDragEnd = () => {
@@ -71,19 +66,14 @@ export default function MobileBottomSheet() {
     setIsDragging(false);
     document.body.style.userSelect = "";
 
-    // 스냅(Snap) 로직: 특정 기준점 이하면 닫거나 기본 크기로
-    const peekHeight = windowHeight * 0.4;
-    const expandedHeight = windowHeight * 0.8;
-
-    if (height < peekHeight * 0.5) {
+    // 스냅(Snap) 로직 대신, 사용자가 원하는 자유로운 높이를 영구 저장
+    if (height < 100) {
       // 아주 낮게 내리면 닫기
       setBottomSheetTab("none");
-    } else if (height > peekHeight && height < (peekHeight + expandedHeight) / 2) {
-      // 어중간하게 올렸으면 Peek 높이로 스냅
-      setHeight(peekHeight);
-    } else if (height >= (peekHeight + expandedHeight) / 2) {
-      // 많이 올렸으면 Expanded 높이로 스냅
-      setHeight(expandedHeight);
+    } else {
+      // 드래그가 끝난 최종 높이를 비율로 저장 (기기 방향 전환 시에도 비율 유지)
+      const ratio = height / windowHeight;
+      localStorage.setItem("bottomSheetHeightRatio", ratio.toString());
     }
   };
 

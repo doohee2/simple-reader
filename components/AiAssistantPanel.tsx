@@ -91,11 +91,11 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
       clearActionIntent();
       handleTranslate("translate");
     } else if (actionIntent === "memo") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setActiveTab("memo");
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setIsAddingMemo(true);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setNewMemoContent("");
       clearActionIntent();
     }
