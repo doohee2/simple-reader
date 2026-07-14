@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Library, Trash2, FileText, CheckCircle2, Clock } from "lucide-react";
+import { X, Library, Trash2, FileText, CheckCircle2, Clock, Monitor, Cloud } from "lucide-react";
 import { getStorageStats, deletePdfCache, clearAllPdfCaches, StorageStat } from "@/lib/db";
 import db from "@/lib/db";
 import { useStore } from "@/store/useStore";
@@ -133,13 +133,17 @@ export default function StorageManagerModal({ isOpen, onClose }: StorageManagerM
                         )}
                         
                         {/* Status Badge */}
-                        {stat.isCached ? (
+                        {stat.fileId.startsWith('local-') ? (
+                          <span className="inline-flex items-center gap-1 bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-bold">
+                            <Monitor size={12} /> 기기 파일 (오프라인 전용)
+                          </span>
+                        ) : stat.isCached ? (
                           <span className="inline-flex items-center gap-1 bg-secondary/10 text-secondary border border-secondary/20 px-2 py-0.5 rounded text-[10px] font-bold">
-                            <CheckCircle2 size={12} /> 캐시됨
+                            <CheckCircle2 size={12} /> 드라이브 (캐시됨)
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded text-[10px] font-bold">
-                            <Clock size={12} /> 드라이브에만 있음
+                            <Cloud size={12} /> 드라이브에만 있음
                           </span>
                         )}
                       </div>

@@ -28,7 +28,7 @@ export function useMetadataSync(fileId: string | null) {
   const isSyncingRef = useRef(false);
 
   const manualSync = useCallback(async () => {
-    if (!fileId || !userId || isSyncingRef.current) return;
+    if (!fileId || !userId || isSyncingRef.current || fileId.startsWith('local-')) return;
     isSyncingRef.current = true;
     setIsSyncing(true);
 
@@ -186,6 +186,8 @@ export function useMetadataSync(fileId: string | null) {
 
     const { selectedFileName } = useStore.getState();
 
+    const isLocalFile = fileId.startsWith('local-');
+
     const newMeta: PdfMetadata = {
       id: crypto.randomUUID(), // 고유 ID
       fileId,
@@ -195,14 +197,14 @@ export function useMetadataSync(fileId: string | null) {
       selectedText,
       content,
       updatedAt: new Date().toISOString(),
-      isUnsynced: !userId, // 비로그인 시 로컬 비동기 플래그 적용
+      isUnsynced: isLocalFile ? false : !userId, // 로컬 파일은 동기화 대상이 아니므로 플래그 제외
     };
 
     // 로컬 즉시 저장
     await db.pdfMetadata.put(newMeta);
 
-    // 로그인 상태일 때만 백그라운드 서버 동기화 시도
-    if (userId) {
+    // 로그인 상태이면서 드라이브 파일일 때만 서버 동기화 시도
+    if (userId && !isLocalFile) {
       try {
         const { error } = await supabase.from("pdf_metadata").upsert({
           id: newMeta.id,
@@ -229,16 +231,18 @@ export function useMetadataSync(fileId: string | null) {
   
   // 4. 메타데이터 업데이트 (수정)
   const updateMetadata = async (id: string, newContent: string) => {
+    const isLocalFile = fileId?.startsWith('local-');
+
     // 로컬 즉시 업데이트
     const item = await db.pdfMetadata.get(id);
     if (item) {
       item.content = newContent;
       item.updatedAt = new Date().toISOString();
-      item.isUnsynced = !userId;
+      item.isUnsynced = isLocalFile ? false : !userId;
       await db.pdfMetadata.put(item);
     }
 
-    if (userId) {
+    if (userId && !isLocalFile) {
       // 백그라운드 서버 동기화
       try {
         const { error } = await supabase.from("pdf_metadata")
@@ -257,6 +261,7 @@ export function useMetadataSync(fileId: string | null) {
 
   // 5. 메타데이터 삭제 (Soft Delete)
   const deleteMetadata = async (id: string) => {
+    const isLocalFile = fileId?.startsWith('local-');
     const now = new Date().toISOString();
 
     // 로컬 Soft Delete 처리 (실제 삭제 대신 deletedAt 기록)
@@ -264,11 +269,11 @@ export function useMetadataSync(fileId: string | null) {
     if (item) {
       item.deletedAt = now;
       item.updatedAt = now;
-      item.isUnsynced = !userId;
+      item.isUnsynced = isLocalFile ? false : !userId;
       await db.pdfMetadata.put(item);
     }
 
-    if (userId) {
+    if (userId && !isLocalFile) {
       // 백그라운드 서버 동기화 (업데이트)
       try {
         const { error } = await supabase.from("pdf_metadata")

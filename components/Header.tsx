@@ -2,17 +2,19 @@
 
 import { Library, X } from "lucide-react";
 import { signIn, signOut, useSession } from "next-auth/react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import DrivePickerModal from "./DrivePickerModal";
 import StorageManagerModal from "./StorageManagerModal";
 import BookInfoModal from "./BookInfoModal";
 import { useStore } from "@/store/useStore";
 import { APP_INFO } from "@/lib/constants";
+import db from "@/lib/db";
 
 export default function Header() {
   const { data: session, status } = useSession();
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [isBookInfoModalOpen, setIsBookInfoModalOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const { 
     selectedFileId,
@@ -30,6 +32,29 @@ export default function Header() {
   const handleSelectFile = (fileId: string, fileName: string, fileSize: number | null) => {
     setSelectedFile(fileId, fileName, fileSize);
     setIsDrivePickerOpen(false);
+  };
+
+  const handleLocalFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const arrayBuffer = await file.arrayBuffer();
+    const newFileId = `local-${crypto.randomUUID()}`;
+    
+    // 로컬 캐시에 즉시 저장
+    await db.pdfCache.put({
+      fileId: newFileId,
+      fileName: file.name,
+      fileSize: file.size,
+      data: arrayBuffer,
+      updatedAt: new Date().toISOString(),
+    });
+
+    // 전역 상태 업데이트 (뷰어 열기)
+    setSelectedFile(newFileId, file.name, file.size);
+    
+    // 파일 입력 초기화
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const iconButtonClass = "w-9 h-9 md:w-10 md:h-10 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors duration-200 rounded-full hover:bg-surface-variant flex-shrink-0";
@@ -103,13 +128,22 @@ export default function Header() {
               <span className={iconClass}>close</span>
             </button>
           ) : (
-            <button 
-              onClick={() => status === "authenticated" ? setIsDrivePickerOpen(true) : signIn("google")}
-              className={iconButtonClass}
-              title="드라이브 파일 열기"
-            >
-              <span className={iconClass}>folder_open</span>
-            </button>
+            <>
+              <input 
+                type="file" 
+                accept="application/pdf" 
+                ref={fileInputRef} 
+                className="hidden" 
+                onChange={handleLocalFileSelect} 
+              />
+              <button 
+                onClick={() => status === "authenticated" ? setIsDrivePickerOpen(true) : fileInputRef.current?.click()}
+                className={iconButtonClass}
+                title={status === "authenticated" ? "드라이브 파일 열기" : "로컬 파일 열기"}
+              >
+                <span className={iconClass}>{status === "authenticated" ? "folder_open" : "upload_file"}</span>
+              </button>
+            </>
           )}
 
           {/* 인증 상태에 따른 버튼들 */}

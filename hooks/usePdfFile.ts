@@ -47,6 +47,14 @@ export function usePdfFile(fileId: string | null) {
           return;
         }
         
+        if (fileId?.startsWith('local-')) {
+          if (isMountedRef.current) {
+            setError("로컬 기기 저장소에서 해당 파일을 찾을 수 없습니다. (캐시가 삭제되었을 수 있습니다.) 다시 업로드해주세요.");
+            setDownloadState('error');
+          }
+          return;
+        }
+
         if (isMountedRef.current) {
           setDownloadState('confirm');
         }

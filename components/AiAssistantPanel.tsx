@@ -414,14 +414,18 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
             <div className="mt-4 border-t border-outline-variant pt-6 pb-2">
               <button 
                 onClick={() => manualSync()}
-                disabled={isSyncing}
+                disabled={isSyncing || (selectedFileId?.startsWith('local-') ?? false)}
                 className="w-full py-2.5 flex items-center justify-center gap-2 bg-surface-container border border-outline-variant rounded-xl text-on-surface hover:bg-surface-variant hover:text-primary transition-all disabled:opacity-50 font-ui-label-bold shadow-sm"
               >
-                <span className={`material-symbols-outlined text-[18px] ${isSyncing ? "animate-spin" : ""}`}>sync</span>
+                <span className={`material-symbols-outlined text-[18px] ${isSyncing ? "animate-spin" : ""}`}>
+                  {selectedFileId?.startsWith('local-') ? "cloud_off" : "sync"}
+                </span>
                 {isSyncing ? "동기화 중..." : "서버와 즉시 동기화"}
               </button>
               <p className="text-center text-[10px] text-on-surface-variant mt-2">
-                로컬에만 있는 메모는 서버로, 서버에만 있는 메모는 로컬로 가져옵니다.
+                {selectedFileId?.startsWith('local-') 
+                  ? "로컬 전용 파일의 메모, 책갈피는 동기화되지 않습니다."
+                  : "로컬에만 있는 메모는 서버로, 서버에만 있는 메모는 로컬로 가져옵니다."}
               </p>
             </div>
           </div>
