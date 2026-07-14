@@ -720,7 +720,12 @@ export default function PdfViewer() {
           
           if (containerRef.current) {
             containerRef.current.scrollLeft = 0;
-            // scrollTop 유지 (단일보기는 0, 연속보기는 그대로)
+            if (viewMode === "continuous") {
+              // 줌이 풀리면서 전체 스크롤 높이가 줄어들면 다른 페이지로 날아가는 것을 방지하기 위해 현재 페이지로 다시 스크롤
+              scrollToPage(pageNumber, true, 50);
+            } else {
+              containerRef.current.scrollTop = 0;
+            }
           }
         };
         
