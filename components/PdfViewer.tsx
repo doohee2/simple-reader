@@ -514,22 +514,6 @@ export default function PdfViewer() {
   
   stateRef.current = { currentScale, zoomMode, customScale, fitScale };
 
-  // 휠/트랙패드 줌 종료 핸들러 (오염 위험 없음, ref.state 직접 사용)
-  const handleZoomStop = (ref: any) => {
-    setIsQuickZoomed(false);
-    
-    const libScale = ref.state.scale;
-    const currentScale = stateRef.current.currentScale;
-    
-    if (Math.abs(libScale - 1) < 0.05) {
-      transformRef.current?.resetTransform(0);
-      return;
-    }
-    
-    const targetScale = Math.min(Math.max(currentScale * libScale, 0.25), 8.0);
-    applyZoomWithAnchor(targetScale, "custom");
-  };
-
   // 핀치 줌 종료 핸들러 (오염된 ref.state 대신 lastGoodPinchStateRef 사용)
   const handlePinchStop = () => {
     setIsQuickZoomed(false);
@@ -616,7 +600,6 @@ export default function PdfViewer() {
           });
         }
       }}
-      onZoomStop={handleZoomStop}
       onPinchStop={handlePinchStop}
     >
       {({ state }) => {
