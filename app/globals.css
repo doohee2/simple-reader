@@ -1,5 +1,5 @@
 @import "tailwindcss";
-
+@custom-variant dark (&:where(.dark, .dark *));
 @theme {
   --color-background: #f8fafc; /* Slate-50 for light mode background */
   --color-on-background: #0f172a; /* Slate-900 for text */
