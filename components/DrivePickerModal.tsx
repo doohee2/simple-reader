@@ -22,6 +22,7 @@ export default function DrivePickerModal({ isOpen, onClose, onSelectFile }: Driv
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [isInitialized, setIsInitialized] = useState(false);
   const [defaultFolderId, setDefaultFolderId] = useState<string | null>(null);
   
   // 경로 상태 (breadcrumb)
@@ -47,12 +48,19 @@ export default function DrivePickerModal({ isOpen, onClose, onSelectFile }: Driv
         setDefaultFolderId(null);
         setPath([{ id: "root", name: "내 드라이브" }]);
       }
+      setIsInitialized(true);
+    } else {
+      setIsInitialized(false);
+      // 모달이 닫힐 때 경로를 초기화해두어 다음 번 열릴 때 깜빡임을 방지
+      setPath([{ id: "root", name: "내 드라이브" }]);
     }
   }, [isOpen]);
 
   // 폴더 아이디가 바뀔 때마다 파일 목록 다시 불러오기
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !isInitialized) return;
+
+    let ignore = false; // 플래그를 사용하여 Race Condition 방지
 
     async function fetchFiles() {
       setLoading(true);
@@ -63,17 +71,28 @@ export default function DrivePickerModal({ isOpen, onClose, onSelectFile }: Driv
           throw new Error("파일 목록을 불러오는 데 실패했습니다.");
         }
         const data = await res.json();
-        setFiles(data.files || []);
+        
+        if (!ignore) {
+          setFiles(data.files || []);
+        }
       } catch (err: unknown) {
-        if (err instanceof Error) setError(err.message);
-        else setError("Unknown error occurred");
+        if (!ignore) {
+          if (err instanceof Error) setError(err.message);
+          else setError("Unknown error occurred");
+        }
       } finally {
-        setLoading(false);
+        if (!ignore) {
+          setLoading(false);
+        }
       }
     }
 
     fetchFiles();
-  }, [isOpen, currentFolderId]);
+    
+    return () => {
+      ignore = true; // 의존성이 변경되어 이펙트가 정리될 때 이전 요청 무시
+    };
+  }, [isOpen, isInitialized, currentFolderId]);
 
   const handleFolderClick = (folderId: string, folderName: string) => {
     setPath((prev) => [...prev, { id: folderId, name: folderName }]);

@@ -75,8 +75,8 @@ export default function Header() {
             </button>
             <div className="flex items-center">
               <svg viewBox="0 0 340 60" className={`h-[28px] sm:h-[34px] w-auto drop-shadow-sm ${selectedFileName ? 'hidden sm:block' : 'block'}`} fill="none" xmlns="http://www.w3.org/2000/svg" style={{ fontFamily: 'var(--font-plus-jakarta-sans), sans-serif' }}>
-                <text x="0" y="45" fontWeight="800" fontSize="42" letterSpacing="-0.02em" className="fill-[#0066ff] dark:fill-[#d0ebff] transition-colors duration-300">Simple</text>
-                <circle cx="18" cy="10" r="4" className="fill-[#0066ff] dark:fill-[#d0ebff] transition-colors duration-300"/>
+                <text x="0" y="45" fontWeight="800" fontSize="42" letterSpacing="-0.02em" className="fill-[#0044cc] dark:fill-[#d0ebff] transition-colors duration-300">Simple</text>
+                <circle cx="18" cy="10" r="4" className="fill-[#0044cc] dark:fill-[#d0ebff] transition-colors duration-300"/>
                 <text x="150" y="45" fontWeight="700" fontSize="42" letterSpacing="-0.02em" className="fill-current text-on-surface transition-colors duration-300">Reader</text>
               </svg>
             </div>
@@ -204,8 +204,8 @@ export default function Header() {
             <div className="flex items-center justify-center mb-6 mt-2 gap-2 text-primary">
               <span className="material-symbols-outlined text-[28px]">info</span>
               <svg viewBox="0 0 340 60" className="h-[36px] w-auto drop-shadow-sm" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ fontFamily: 'var(--font-plus-jakarta-sans), sans-serif' }}>
-                <text x="0" y="45" fontWeight="800" fontSize="42" letterSpacing="-0.02em" className="fill-[#0066ff] dark:fill-[#d0ebff] transition-colors duration-300">Simple</text>
-                <circle cx="18" cy="10" r="4" className="fill-[#0066ff] dark:fill-[#d0ebff] transition-colors duration-300"/>
+                <text x="0" y="45" fontWeight="800" fontSize="42" letterSpacing="-0.02em" className="fill-[#0044cc] dark:fill-[#d0ebff] transition-colors duration-300">Simple</text>
+                <circle cx="18" cy="10" r="4" className="fill-[#0044cc] dark:fill-[#d0ebff] transition-colors duration-300"/>
                 <text x="150" y="45" fontWeight="700" fontSize="42" letterSpacing="-0.02em" className="fill-current text-on-surface transition-colors duration-300">Reader</text>
               </svg>
             </div>
