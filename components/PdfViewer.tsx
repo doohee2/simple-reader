@@ -71,7 +71,15 @@ const LazyPage = React.memo(({
   const expectedHeight = expectedWidth * 1.414;
 
   return (
-    <div id={`page-${pageNumber}`} ref={ref} className="mb-4 relative mx-auto w-max min-h-[600px]">
+    <div 
+      id={`page-${pageNumber}`} 
+      ref={ref} 
+      className="relative mx-auto w-max"
+      style={{
+        marginBottom: 'calc(16px * var(--pdf-scale, 1))',
+        minHeight: 'calc(600px * var(--pdf-scale, 1))'
+      }}
+    >
       {isRendered ? (
         <div className="shadow-xl bg-white transition-transform origin-top">
           <Page
@@ -935,6 +943,7 @@ export default function PdfViewer() {
               onTouchStart={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
               onTouchMove={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
               className="w-full flex flex-col items-start p-4"
+              style={{ '--pdf-scale': currentScale } as React.CSSProperties}
             >
               <Document
                 file={documentFile}
