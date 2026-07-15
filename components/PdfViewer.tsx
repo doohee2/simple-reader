@@ -146,6 +146,7 @@ export default function PdfViewer() {
   const lastClickRef = useRef<{ time: number; x: number; y: number } | null>(null);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pinchCenterRef = useRef<{ x: number; y: number } | null>(null);
+  const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
   const lastGoodPinchStateRef = useRef<{ scale: number; positionX: number; positionY: number } | null>(null);
   
   const stateRef = useRef<{ currentScale: number; zoomMode: "fit" | "custom"; customScale: number; fitScale: number }>({ currentScale: 1, zoomMode: "fit", customScale: 1, fitScale: 1 });
@@ -622,7 +623,11 @@ export default function PdfViewer() {
       panning={{ 
         disabled: true, 
       }}
-      wheel={{ wheelDisabled: true }}
+      wheel={{ 
+        wheelDisabled: false, 
+        step: 0.1, 
+        activationKeys: ["Control", "Meta"] 
+      }}
       pinch={{ step: 5 }}
       doubleClick={{ disabled: true }}
       onTransform={(ref, state) => {
@@ -674,6 +679,21 @@ export default function PdfViewer() {
         }
       }}
       onPinchStop={handlePinchStop}
+      onWheelStop={(ref, event) => {
+        // react-zoom-pan-pinch 내부의 wheel 처리가 끝났을 때 최종 배율을 react-pdf에 커밋
+        const libScale = ref.state.scale;
+        const currentScale = stateRef.current.currentScale;
+        
+        if (Math.abs(libScale - 1) < 0.05) {
+          transformRef.current?.setTransform(0, 0, 1, 0);
+          return;
+        }
+        
+        const targetScale = Math.min(Math.max(currentScale * libScale, 0.5), 5.0);
+        const anchor = lastMousePosRef.current;
+        
+        applyZoomWithAnchor(targetScale, "custom", anchor?.x, anchor?.y);
+      }}
     >
       {({ state }) => {
         const handleZoomIn = () => {
@@ -939,6 +959,7 @@ export default function PdfViewer() {
           >
             <div 
               ref={pdfWrapperRef}
+              onMouseMove={(e) => { lastMousePosRef.current = { x: e.clientX, y: e.clientY }; }}
               onMouseDown={(e) => e.stopPropagation()} 
               onTouchStart={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
               onTouchMove={(e) => { if (e.touches.length === 1) e.stopPropagation(); }}
