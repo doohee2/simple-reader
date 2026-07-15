@@ -76,7 +76,7 @@ const LazyPage = React.memo(({
       ref={ref} 
       className="relative mx-auto w-max"
       style={{
-        marginBottom: 'calc(4px * var(--pdf-scale, 1))',
+        marginBottom: 'calc(1px * var(--pdf-scale, 1))',
         minHeight: 'calc(600px * var(--pdf-scale, 1))'
       }}
     >
