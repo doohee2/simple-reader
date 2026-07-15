@@ -76,7 +76,7 @@ const LazyPage = React.memo(({
       ref={ref} 
       className="relative mx-auto w-max"
       style={{
-        marginBottom: 'calc(16px * var(--pdf-scale, 1))',
+        marginBottom: 'calc(4px * var(--pdf-scale, 1))',
         minHeight: 'calc(600px * var(--pdf-scale, 1))'
       }}
     >
@@ -295,6 +295,71 @@ export default function PdfViewer() {
       }, 200);
     }, delay);
   }, []);
+
+  // Native Ctrl+Wheel Zoom Interceptor
+  useEffect(() => {
+    let wheelTimeout: NodeJS.Timeout | null = null;
+    let tempScale = 0;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault(); // Stop native browser zoom completely!
+        e.stopPropagation(); // Stop react-zoom-pan-pinch from processing it natively
+
+        // Check if mouse is inside the PDF viewer wrapper
+        let isInside = true;
+        if (transformRef.current && transformRef.current.instance) {
+          const rect = transformRef.current.instance.wrapperComponent?.getBoundingClientRect();
+          if (rect) {
+            isInside = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
+          }
+        }
+
+        // If outside the container, just ignore the wheel zoom to avoid confusion
+        if (!isInside) {
+          return;
+        }
+
+        if (tempScale === 0) tempScale = stateRef.current.currentScale;
+
+        // e.deltaY is 100 or -100 on standard mice.
+        const delta = Math.exp(-e.deltaY * 0.0015);
+        tempScale = Math.min(Math.max(tempScale * delta, 0.5), 5.0);
+
+        // 1. VISUAL ZOOM ONLY (60fps, CSS Transform) - No flicker
+        if (transformRef.current && transformRef.current.instance) {
+          const instance = transformRef.current.instance;
+          const rect = instance.wrapperComponent?.getBoundingClientRect();
+          
+          if (rect) {
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            const currentCssScale = instance.state.scale;
+            const targetCssScale = tempScale / stateRef.current.currentScale;
+            
+            const scaleRatio = currentCssScale > 0 ? targetCssScale / currentCssScale : 1;
+            
+            const newPosX = mouseX - (mouseX - instance.state.positionX) * scaleRatio;
+            const newPosY = mouseY - (mouseY - instance.state.positionY) * scaleRatio;
+            
+            transformRef.current.setTransform(newPosX, newPosY, targetCssScale, 0);
+          }
+        }
+
+        // 2. COMMIT TO HIGH-RES REACT-PDF ONLY WHEN WHEEL STOPS
+        if (wheelTimeout) clearTimeout(wheelTimeout);
+        wheelTimeout = setTimeout(() => {
+          applyZoomWithAnchor(tempScale, "custom", e.clientX, e.clientY);
+          tempScale = 0;
+        }, 150);
+      }
+    };
+
+    // capture: true prevents react-zoom-pan-pinch from handling it first
+    window.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+    return () => window.removeEventListener('wheel', handleWheel);
+  }, [applyZoomWithAnchor]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -623,11 +688,7 @@ export default function PdfViewer() {
       panning={{ 
         disabled: true, 
       }}
-      wheel={{ 
-        wheelDisabled: false, 
-        step: 0.1, 
-        activationKeys: ["Control", "Meta"] 
-      }}
+      wheel={{ wheelDisabled: true }}
       pinch={{ step: 5 }}
       doubleClick={{ disabled: true }}
       onTransform={(ref, state) => {
@@ -679,21 +740,6 @@ export default function PdfViewer() {
         }
       }}
       onPinchStop={handlePinchStop}
-      onWheelStop={(ref, event) => {
-        // react-zoom-pan-pinch 내부의 wheel 처리가 끝났을 때 최종 배율을 react-pdf에 커밋
-        const libScale = ref.state.scale;
-        const currentScale = stateRef.current.currentScale;
-        
-        if (Math.abs(libScale - 1) < 0.05) {
-          transformRef.current?.setTransform(0, 0, 1, 0);
-          return;
-        }
-        
-        const targetScale = Math.min(Math.max(currentScale * libScale, 0.5), 5.0);
-        const anchor = lastMousePosRef.current;
-        
-        applyZoomWithAnchor(targetScale, "custom", anchor?.x, anchor?.y);
-      }}
     >
       {({ state }) => {
         const handleZoomIn = () => {
