@@ -734,7 +734,8 @@ export default function PdfViewer() {
         }
         
         if (isDebugMode) {
-          setDebugInfo({
+          setDebugInfo(prev => ({
+            ...prev,
             event: "onPinch",
             scale: ref.state.scale,
             posX: ref.state.positionX,
@@ -742,7 +743,7 @@ export default function PdfViewer() {
             anchorX: pinchCenterRef.current?.x || 0,
             anchorY: pinchCenterRef.current?.y || 0,
             msg: "tracking"
-          });
+          }));
         }
       }}
       onPinchStop={handlePinchStop}
