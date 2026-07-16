@@ -345,15 +345,15 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
               <div className="flex gap-2">
                 <button 
                   onClick={() => setIsAddingMemo(true)}
-                  className="flex-1 py-3 border border-dashed border-outline-variant rounded-xl text-on-surface-variant hover:bg-surface-variant hover:text-primary transition-colors flex items-center justify-center gap-2 font-ui-label-bold"
+                  className="flex-1 py-2 border border-dashed border-outline-variant rounded-lg text-on-surface-variant hover:bg-surface-variant hover:text-primary transition-colors flex items-center justify-center gap-1.5 text-xs font-bold"
                 >
-                  <span className="material-symbols-outlined text-[18px]">add</span>
+                  <span className="material-symbols-outlined text-[16px]">add</span>
                   새 메모 작성하기
                 </button>
                 <select
                   value={sortOrder}
                   onChange={(e) => setSortOrder(e.target.value as "time" | "page")}
-                  className="bg-surface border border-outline-variant rounded-xl px-2 py-3 text-xs text-on-surface-variant focus:outline-none focus:border-primary transition-all shadow-sm shrink-0 outline-none"
+                  className="bg-surface border border-outline-variant rounded-lg px-2 py-2 text-xs text-on-surface-variant focus:outline-none focus:border-primary transition-all shadow-sm shrink-0 outline-none"
                 >
                   <option value="time">최신순</option>
                   <option value="page">페이지순</option>
