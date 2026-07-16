@@ -234,37 +234,6 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
               </div>
             </div>
 
-            {/* Custom Prompt & Model Selection */}
-            <div className="flex flex-col gap-2 mt-0">
-              <div className="flex gap-2">
-                <select
-                  value={selectedModel}
-                  onChange={(e) => setSelectedModel(e.target.value)}
-                  className="bg-surface border border-outline-variant rounded-lg px-2 py-2 text-xs text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm w-[40%]"
-                  disabled={isTranslating}
-                >
-                  <option value="gemini-flash-lite-latest">gemini-flash-lite-latest</option>
-                  <option value="gemini-flash-latest">gemini-flash-latest</option>
-                  <option value="gemini-pro-latest">gemini-pro-latest</option>
-                </select>
-                <input
-                  type="text"
-                  placeholder="추가 요청사항 (예: 경어체로 번역, 설명 생략)"
-                  value={customPrompt}
-                  onChange={(e) => setCustomPrompt(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && selectedText && !isTranslating) {
-                      handleTranslate("translate");
-                    }
-                  }}
-                  className="w-[60%] bg-surface border border-outline-variant rounded-lg px-3 py-2 text-xs text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm"
-                  disabled={!selectedText || isTranslating}
-                />
-              </div>
-            </div>
-
-
-
             {/* AI Result Box */}
             {(translationResult || isTranslating || error) && (
               <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex flex-col gap-3 relative mt-1 shadow-[inset_0_0_20px_rgba(208,188,255,0.05)]">
@@ -294,6 +263,35 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
                 </button>
               </div>
             )}
+
+            {/* Custom Prompt & Model Selection */}
+            <div className="flex flex-col gap-2 mt-0">
+              <div className="flex gap-2">
+                <select
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  className="bg-surface border border-outline-variant rounded-lg px-2 py-2 text-xs text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm w-[40%]"
+                  disabled={isTranslating}
+                >
+                  <option value="gemini-flash-lite-latest">gemini-flash-lite-latest</option>
+                  <option value="gemini-flash-latest">gemini-flash-latest</option>
+                  <option value="gemini-pro-latest">gemini-pro-latest</option>
+                </select>
+                <input
+                  type="text"
+                  placeholder="추가 요청사항 (예: 경어체로 번역, 설명 생략)"
+                  value={customPrompt}
+                  onChange={(e) => setCustomPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && selectedText && !isTranslating) {
+                      handleTranslate("translate");
+                    }
+                  }}
+                  className="w-[60%] bg-surface border border-outline-variant rounded-lg px-3 py-2 text-xs text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm"
+                  disabled={!selectedText || isTranslating}
+                />
+              </div>
+            </div>
           </>
         )}
         
