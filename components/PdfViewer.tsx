@@ -140,7 +140,7 @@ export default function PdfViewer() {
   const [pinchSpikeThreshold, setPinchSpikeThreshold] = useState<number>(50);
   const [showThresholdModal, setShowThresholdModal] = useState(false);
   const [isDebugMode, setIsDebugMode] = useState(false);
-  const [debugInfo, setDebugInfo] = useState({ event: "", scale: 0, posX: 0, posY: 0, anchorX: 0, anchorY: 0, msg: "" });
+  const [debugInfo, setDebugInfo] = useState({ event: "", scale: 0, posX: 0, posY: 0, anchorX: 0, anchorY: 0, msg: "", mediaBox: [] as number[], cropBox: [] as number[] });
   const pinchHistoryRef = useRef<{scale: number, time: number}[]>([]);
   const quickZoomOriginalRef = useRef<{ scale: number; zoomMode: "fit" | "custom" } | null>(null);
   const lastClickRef = useRef<{ time: number; x: number; y: number } | null>(null);
@@ -417,11 +417,17 @@ export default function PdfViewer() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const onPageLoadSuccess = useCallback((page: any) => {
+    if (isDebugMode) {
+      const mediaBox = page._pageInfo?.mediaBox || [];
+      const cropBox = page._pageInfo?.cropBox || page.view || [];
+      setDebugInfo(prev => ({ ...prev, mediaBox, cropBox }));
+    }
+
     if (pageBaseWidth === 0) {
       const width = page.originalWidth || page.getViewport?.({ scale: 1 })?.width || 800;
       setPageBaseWidth(width);
     }
-  }, [pageBaseWidth]);
+  }, [pageBaseWidth, isDebugMode]);
 
   // 모바일 및 PC 통합 텍스트 선택 감지 (selectionchange 이벤트)
   useEffect(() => {
@@ -933,6 +939,8 @@ export default function PdfViewer() {
             <div>posY: {debugInfo.posY.toFixed(2)}</div>
             <div>anchorX: {debugInfo.anchorX.toFixed(2)}</div>
             <div>anchorY: {debugInfo.anchorY.toFixed(2)}</div>
+            {debugInfo.mediaBox && debugInfo.mediaBox.length > 0 && <div>mediaBox: [{debugInfo.mediaBox.map(n => Math.round(n)).join(', ')}]</div>}
+            {debugInfo.cropBox && debugInfo.cropBox.length > 0 && <div>cropBox: [{debugInfo.cropBox.map(n => Math.round(n)).join(', ')}]</div>}
             <div className="text-yellow-400 mt-1">msg: {debugInfo.msg}</div>
           </div>
         )}

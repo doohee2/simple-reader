@@ -71,6 +71,23 @@
   --color-on-secondary-container: #00311f;
 }
 
+/* Dark mode scrollbar styles for webkit browsers */
+.dark ::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+.dark ::-webkit-scrollbar-track {
+  background: var(--color-surface-container);
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--color-outline-variant);
+  border-radius: 6px;
+  border: 3px solid var(--color-surface-container);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--color-outline);
+}
+
 body {
   background-color: var(--color-background);
   color: var(--color-on-background);

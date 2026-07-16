@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useStore } from "@/store/useStore";
 import { useMetadataSync } from "@/hooks/useMetadataSync";
 
@@ -11,6 +11,8 @@ interface AiAssistantPanelProps {
 
 export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {}) {
   const [activeTab, setActiveTab] = useState<"ai" | "memo">("ai");
+  const [sortOrder, setSortOrder] = useState<"time" | "page">("time");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (forceTab) {
@@ -34,6 +36,17 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
 
   const [isAddingMemo, setIsAddingMemo] = useState(false);
   const [newMemoContent, setNewMemoContent] = useState("");
+
+  const adjustTextareaHeight = useCallback(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+    }
+  }, []);
+
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [selectedText, adjustTextareaHeight]);
 
   const handleTranslate = useCallback(async (mode: "translate" | "summary" = "translate") => {
     if (!selectedText) return;
@@ -159,13 +172,34 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 custom-scrollbar">
         {activeTab === "ai" && (
           <>
             {/* Source Quote */}
             <div className="flex flex-col gap-2">
-              <span className="text-ui-label-sm text-on-surface-variant uppercase tracking-wider flex justify-between items-center">
-                <span>선택된 문장</span>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <span className="text-ui-label-sm text-on-surface-variant uppercase tracking-wider">선택된 문장</span>
+                  {selectedText && (
+                    <div className="flex gap-1 ml-1">
+                      <button 
+                        onClick={() => handleTranslate("translate")}
+                        disabled={isTranslating}
+                        className="flex items-center gap-1 bg-secondary text-on-secondary px-2 py-1 rounded text-[11px] font-bold hover:bg-[#00a572] transition-colors shadow-sm disabled:opacity-50"
+                      >
+                        {isTranslating ? <Loader2 size={12} className="animate-spin" /> : <span className="material-symbols-outlined text-[12px]">translate</span>}
+                        한국어로 번역
+                      </button>
+                      <button 
+                        onClick={() => handleTranslate("summary")}
+                        disabled={isTranslating}
+                        className="flex items-center gap-1 bg-surface-variant text-on-surface px-2 py-1 rounded text-[11px] font-bold hover:bg-surface-bright transition-colors shadow-sm disabled:opacity-50"
+                      >
+                        요약
+                      </button>
+                    </div>
+                  )}
+                </div>
                 {selectedText && (
                   <div className="flex items-center gap-2">
                     <span className="text-primary text-[10px] bg-primary/10 px-1.5 py-0.5 rounded">
@@ -180,9 +214,10 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
                     </button>
                   </div>
                 )}
-              </span>
+              </div>
               <div className="bg-surface-container-low border-l-2 border-outline-variant p-3 rounded-r-lg min-h-[60px] flex">
                 <textarea
+                  ref={textareaRef}
                   value={selectedText}
                   onChange={(e) => {
                     const text = e.target.value;
@@ -192,19 +227,20 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
                       clearSelectedText();
                     }
                   }}
-                  placeholder="좌측 PDF에서 텍스트를 드래그하거나 이곳에 직접 입력해 주세요."
-                  className="w-full bg-transparent border-none resize-y min-h-[60px] font-reading-body text-reading-body text-on-surface text-sm focus:outline-none placeholder:text-ui-body placeholder:text-on-surface-variant/70 custom-scrollbar"
+                  placeholder="PDF에서 텍스트를 드래그하거나 이곳에 직접 입력해 주세요."
+                  className="w-full bg-transparent border-none resize-none overflow-y-auto min-h-[60px] font-ui-body text-sm leading-relaxed break-all whitespace-pre-wrap text-on-surface focus:outline-none placeholder:text-ui-body placeholder:text-on-surface-variant/70 custom-scrollbar"
+                  style={{ fieldSizing: 'content' } as React.CSSProperties}
                 />
               </div>
             </div>
 
             {/* Custom Prompt & Model Selection */}
-            <div className="flex flex-col gap-2 mt-2">
+            <div className="flex flex-col gap-2 mt-0">
               <div className="flex gap-2">
                 <select
                   value={selectedModel}
                   onChange={(e) => setSelectedModel(e.target.value)}
-                  className="bg-surface border border-outline-variant rounded-lg px-2 py-3 text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm w-[40%]"
+                  className="bg-surface border border-outline-variant rounded-lg px-2 py-2 text-xs text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm w-[40%]"
                   disabled={isTranslating}
                 >
                   <option value="gemini-flash-lite-latest">gemini-flash-lite-latest</option>
@@ -221,54 +257,39 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
                       handleTranslate("translate");
                     }
                   }}
-                  className="w-[60%] bg-surface border border-outline-variant rounded-lg p-3 text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm"
+                  className="w-[60%] bg-surface border border-outline-variant rounded-lg px-3 py-2 text-xs text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm"
                   disabled={!selectedText || isTranslating}
                 />
               </div>
             </div>
 
-            {/* Action Area */}
-            <div className="flex justify-between items-center mt-2">
-              <button 
-                onClick={() => handleTranslate("translate")}
-                disabled={!selectedText || isTranslating}
-                className="flex items-center gap-2 bg-secondary text-on-secondary px-4 py-2 rounded text-ui-label-bold hover:bg-[#00a572] transition-colors shadow-md disabled:opacity-50"
-              >
-                {isTranslating ? <Loader2 size={16} className="animate-spin" /> : <span className="material-symbols-outlined text-[16px]">translate</span>}
-                한국어로 번역
-              </button>
-              <button 
-                onClick={() => handleTranslate("summary")}
-                disabled={!selectedText || isTranslating}
-                className="flex items-center gap-2 bg-surface-variant text-on-surface px-4 py-2 rounded text-ui-label-bold hover:bg-surface-bright transition-colors disabled:opacity-50"
-              >
-                요약하기
-              </button>
-            </div>
+
 
             {/* AI Result Box */}
             {(translationResult || isTranslating || error) && (
-              <div className="bg-primary/5 border border-primary/20 rounded-xl p-5 flex flex-col gap-4 relative mt-2 shadow-[inset_0_0_20px_rgba(208,188,255,0.05)]">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary text-[16px]">auto_awesome</span>
-                  <span className="text-ui-label-bold text-primary">제미나이 AI</span>
-                </div>
+              <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex flex-col gap-3 relative mt-1 shadow-[inset_0_0_20px_rgba(208,188,255,0.05)]">
+                {(!translationResult || isTranslating) && (
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-[14px]">auto_awesome</span>
+                    <span className="text-ui-label-bold text-primary text-xs">제미나이 AI</span>
+                  </div>
+                )}
                 
                 {error ? (
-                  <p className="text-error text-ui-body">{error}</p>
+                  <p className="text-error text-sm">{error}</p>
                 ) : (
-                  <p className={`font-ui-body text-ui-body text-on-surface leading-relaxed ${isTranslating ? "streaming-cursor" : ""}`}>
+                  <p className={`font-ui-body text-sm text-on-surface leading-relaxed break-keep whitespace-pre-wrap ${isTranslating ? "streaming-cursor" : ""}`}>
                     {translationResult}
                   </p>
                 )}
 
-                <div className="w-full h-px bg-outline-variant/30 my-2"></div>
+                <div className="w-full h-px bg-outline-variant/30 my-1"></div>
                 <button 
                   onClick={handleSaveMemo}
                   disabled={isTranslating || !translationResult || !!error}
-                  className="flex items-center justify-center gap-2 w-full py-2 border border-outline-variant rounded hover:bg-surface-variant text-on-surface transition-colors text-ui-label-bold disabled:opacity-50"
+                  className="flex items-center justify-center gap-1.5 w-full py-1.5 border border-outline-variant rounded hover:bg-surface-variant text-on-surface transition-colors text-xs font-bold disabled:opacity-50"
                 >
-                  <span className="material-symbols-outlined text-[16px]">save</span>
+                  <span className="material-symbols-outlined text-[14px]">save</span>
                   메모로 저장
                 </button>
               </div>
@@ -321,13 +342,23 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
                 </div>
               </div>
             ) : (
-              <button 
-                onClick={() => setIsAddingMemo(true)}
-                className="w-full py-3 border border-dashed border-outline-variant rounded-xl text-on-surface-variant hover:bg-surface-variant hover:text-primary transition-colors flex items-center justify-center gap-2 font-ui-label-bold"
-              >
-                <span className="material-symbols-outlined text-[18px]">add</span>
-                새 메모 작성하기
-              </button>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setIsAddingMemo(true)}
+                  className="flex-1 py-3 border border-dashed border-outline-variant rounded-xl text-on-surface-variant hover:bg-surface-variant hover:text-primary transition-colors flex items-center justify-center gap-2 font-ui-label-bold"
+                >
+                  <span className="material-symbols-outlined text-[18px]">add</span>
+                  새 메모 작성하기
+                </button>
+                <select
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value as "time" | "page")}
+                  className="bg-surface border border-outline-variant rounded-xl px-2 py-3 text-xs text-on-surface-variant focus:outline-none focus:border-primary transition-all shadow-sm shrink-0 outline-none"
+                >
+                  <option value="time">최신순</option>
+                  <option value="page">페이지순</option>
+                </select>
+              </div>
             )}
 
             {metadataList.length === 0 ? (
@@ -335,11 +366,24 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
                 <p>저장된 메모나 책갈피가 없습니다.</p>
               </div>
             ) : (
-              metadataList.map((meta) => (
+              [...metadataList].sort((a, b) => {
+                if (sortOrder === "page") {
+                  if (a.page === b.page) return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+                  return a.page - b.page;
+                }
+                return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+              }).map((meta) => (
                 <div 
                   key={meta.id} 
                   className="bg-surface-container border border-outline-variant rounded-xl p-4 flex flex-col gap-3 group relative hover:border-primary/50 transition-colors cursor-pointer"
-                  onClick={() => setTargetPage(meta.page)}
+                  onClick={() => {
+                    setTargetPage(meta.page);
+                    if (meta.selectedText) {
+                      setSelectedText(meta.selectedText, meta.page);
+                    } else if (meta.type === "memo") {
+                      setSelectedText(meta.content, meta.page);
+                    }
+                  }}
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-2">
