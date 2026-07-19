@@ -20,6 +20,7 @@ const LazyPage = React.memo(({
   customScale,
   containerWidth, 
   pageBaseWidth,
+  pageBaseHeight,
   onIntersect,
   onPageLoadSuccess
 }: { 
@@ -28,6 +29,7 @@ const LazyPage = React.memo(({
   customScale: number,
   containerWidth: number, 
   pageBaseWidth: number,
+  pageBaseHeight: number,
   onIntersect: (pageNumber: number) => void,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onPageLoadSuccess: (page: any) => void
@@ -68,7 +70,7 @@ const LazyPage = React.memo(({
   const expectedWidth = zoomMode === "fit" 
     ? (containerWidth ? containerWidth - 32 : 800) 
     : (pageBaseWidth || 800) * customScale;
-  const expectedHeight = expectedWidth * 1.414;
+  const expectedHeight = pageBaseHeight && pageBaseWidth ? expectedWidth * (pageBaseHeight / pageBaseWidth) : expectedWidth * 1.414;
 
   return (
     <div 
@@ -77,11 +79,16 @@ const LazyPage = React.memo(({
       className="relative mx-auto w-max"
       style={{
         marginBottom: 'calc(1px * var(--pdf-scale, 1))',
-        minHeight: 'calc(600px * var(--pdf-scale, 1))'
+        minHeight: 'calc(600px * var(--pdf-scale, 1))',
+        width: expectedWidth,
+        height: expectedHeight
       }}
     >
       {isRendered ? (
-        <div className="shadow-xl bg-white transition-transform origin-top">
+        <div 
+          className="shadow-xl bg-white origin-top"
+          style={{ width: expectedWidth, height: expectedHeight }}
+        >
           <Page
             pageNumber={pageNumber}
             width={effectiveWidth}
@@ -126,6 +133,7 @@ export default function PdfViewer() {
   const [zoomMode, setZoomMode] = useState<"fit" | "custom">("fit");
   const [customScale, setCustomScale] = useState<number>(1.0);
   const [pageBaseWidth, setPageBaseWidth] = useState<number>(0);
+  const [pageBaseHeight, setPageBaseHeight] = useState<number>(0);
   const [containerWidth, setContainerWidth] = useState<number>(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -231,6 +239,7 @@ export default function PdfViewer() {
     // CSS transform 제거 (시각적 깜빡임 방지)
     const transformComponent = document.querySelector('.react-transform-component') as HTMLElement;
     if (transformComponent) {
+      transformComponent.style.setProperty("transition", "none", "important");
       transformComponent.style.transform = "";
     }
     
@@ -254,6 +263,7 @@ export default function PdfViewer() {
       instance.state.positionX = 0;
       instance.state.positionY = 0;
       if (transformComponent) {
+        transformComponent.style.setProperty("transition", "none", "important");
         transformComponent.style.transform = "";
       }
     }
@@ -425,7 +435,9 @@ export default function PdfViewer() {
 
     if (pageBaseWidth === 0) {
       const width = page.originalWidth || page.getViewport?.({ scale: 1 })?.width || 800;
+      const height = page.originalHeight || page.getViewport?.({ scale: 1 })?.height || width * 1.414;
       setPageBaseWidth(width);
+      setPageBaseHeight(height);
     }
   }, [pageBaseWidth, isDebugMode]);
 
@@ -1029,7 +1041,16 @@ export default function PdfViewer() {
                 className="w-full flex flex-col items-start pdf-document"
               >
                 {viewMode === "single" ? (
-                  <div id={`page-${pageNumber}`} className="shadow-2xl bg-white transition-transform origin-top mx-auto w-max">
+                  <div 
+                    id={`page-${pageNumber}`} 
+                    className="shadow-xl bg-white origin-top mx-auto"
+                    style={{ 
+                      width: zoomMode === "fit" ? (containerWidth ? containerWidth - 32 : 800) : (pageBaseWidth || 800) * customScale, 
+                      height: pageBaseHeight && pageBaseWidth 
+                        ? (zoomMode === "fit" ? (containerWidth ? containerWidth - 32 : 800) : (pageBaseWidth || 800) * customScale) * (pageBaseHeight / pageBaseWidth) 
+                        : (zoomMode === "fit" ? (containerWidth ? containerWidth - 32 : 800) : (pageBaseWidth || 800) * customScale) * 1.414 
+                    }}
+                  >
                     <Page
                       pageNumber={pageNumber}
                       width={zoomMode === "fit" ? (containerWidth ? containerWidth - 32 : undefined) : undefined}
@@ -1049,6 +1070,7 @@ export default function PdfViewer() {
                       customScale={customScale}
                       containerWidth={containerWidth}
                       pageBaseWidth={pageBaseWidth}
+                      pageBaseHeight={pageBaseHeight}
                       onIntersect={handleIntersect} 
                       onPageLoadSuccess={onPageLoadSuccess}
                     />
