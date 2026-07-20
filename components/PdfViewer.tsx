@@ -14,6 +14,8 @@ import db from "@/lib/db";
 import DownloadProgressModal from "./DownloadProgressModal";
 import { EMPTY_STATE_MESSAGE } from "@/lib/constants";
 
+const INITIAL_DEBUG_INFO = { event: "", scale: 0, posX: 0, posY: 0, anchorX: 0, anchorY: 0, msg: "", mediaBox: [] as number[], cropBox: [] as number[] };
+
 const LazyPage = React.memo(({ 
   pageNumber, 
   zoomMode,
@@ -148,7 +150,7 @@ export default function PdfViewer() {
   const [pinchSpikeThreshold, setPinchSpikeThreshold] = useState<number>(50);
   const [showThresholdModal, setShowThresholdModal] = useState(false);
   const [isDebugMode, setIsDebugMode] = useState(false);
-  const [debugInfo, setDebugInfo] = useState({ event: "", scale: 0, posX: 0, posY: 0, anchorX: 0, anchorY: 0, msg: "", mediaBox: [] as number[], cropBox: [] as number[] });
+  const [debugInfo, setDebugInfo] = useState(INITIAL_DEBUG_INFO);
   const pinchHistoryRef = useRef<{scale: number, time: number}[]>([]);
   const quickZoomOriginalRef = useRef<{ scale: number; zoomMode: "fit" | "custom" } | null>(null);
   const lastClickRef = useRef<{ time: number; x: number; y: number } | null>(null);
@@ -245,6 +247,10 @@ export default function PdfViewer() {
     
     // 공식 API 로도 한번 더 초기화 (onTransform 콜백 등 정상 동기화)
     transformRef.current?.setTransform(0, 0, 1, 0);
+    // setTransform이 내부적으로 transition을 복원할 수 있으므로 재차단
+    if (transformComponent) {
+      transformComponent.style.setProperty("transition", "none", "important");
+    }
     
     // 4. Synchronously update React state and DOM
     flushSync(() => {
@@ -714,7 +720,10 @@ export default function PdfViewer() {
           const { currentScale } = stateRef.current;
           const perceived = currentScale * state.scale;
           const bounded = Math.min(Math.max(0.5, perceived), 5.0);
-          scaleDisplayRef.current.innerText = `${Math.round(bounded * 100)}%`;
+          const text = `${Math.round(bounded * 100)}%`;
+          if (scaleDisplayRef.current.innerText !== text) {
+            scaleDisplayRef.current.innerText = text;
+          }
         }
       }}
       onPinch={(ref) => {
@@ -797,6 +806,7 @@ export default function PdfViewer() {
           
           const transformComponent = document.querySelector('.react-transform-component') as HTMLElement;
           if (transformComponent) {
+            transformComponent.style.setProperty("transition", "none", "important");
             transformComponent.style.transform = "";
           }
           
@@ -1040,16 +1050,16 @@ export default function PdfViewer() {
                 error={<div className="p-4 text-error">문서를 렌더링할 수 없습니다.</div>}
                 className="w-full flex flex-col items-start pdf-document"
               >
-                {viewMode === "single" ? (
+                {(() => {
+                  const singleWidth = zoomMode === "fit" ? (containerWidth ? containerWidth - 32 : 800) : (pageBaseWidth || 800) * customScale;
+                  const aspectRatio = pageBaseHeight && pageBaseWidth ? pageBaseHeight / pageBaseWidth : 1.414;
+                  const singleHeight = singleWidth * aspectRatio;
+                  
+                  return viewMode === "single" ? (
                   <div 
                     id={`page-${pageNumber}`} 
                     className="shadow-xl bg-white origin-top mx-auto"
-                    style={{ 
-                      width: zoomMode === "fit" ? (containerWidth ? containerWidth - 32 : 800) : (pageBaseWidth || 800) * customScale, 
-                      height: pageBaseHeight && pageBaseWidth 
-                        ? (zoomMode === "fit" ? (containerWidth ? containerWidth - 32 : 800) : (pageBaseWidth || 800) * customScale) * (pageBaseHeight / pageBaseWidth) 
-                        : (zoomMode === "fit" ? (containerWidth ? containerWidth - 32 : 800) : (pageBaseWidth || 800) * customScale) * 1.414 
-                    }}
+                    style={{ width: singleWidth, height: singleHeight }}
                   >
                     <Page
                       pageNumber={pageNumber}
@@ -1075,7 +1085,8 @@ export default function PdfViewer() {
                       onPageLoadSuccess={onPageLoadSuccess}
                     />
                   ))
-                )}
+                );
+                })()}
               </Document>
             </div>
           </TransformComponent>

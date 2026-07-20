@@ -170,6 +170,15 @@ simple-reader/
     - **현상:** 연속 보기 모드에서 핀치 줌이나 마우스 휠로 확대/축소 시, 페이지 사이의 여백이 줌 배율을 따라가지 못해 지나치게 벌어지거나 좁아져 화면이 겹치는 어색함 발생.
     - **해결 로직:** `PdfViewer`의 최상위 컨테이너에 CSS 변수 `--pdf-scale`을 주입하고, `LazyPage`의 `marginBottom`과 `minHeight` 속성에 `calc(value * var(--pdf-scale))`을 적용하여 배율 변동에 비례하여 여백도 자연스럽게 증감하도록 설계. 또한 사용성을 위해 기본 여백을 1/4(4px) 수준으로 대폭 축소함.
 
+13. **줌 커밋 시 CSS Transition 충돌에 의한 깜빡임 방지 및 성능 최적화**
+    - **현상:** 핀치 줌, 더블클릭 줌, 마우스 휠 줌, Fit 버튼 클릭 등 배율이 변경되는 모든 동작에서 캔버스가 새로 그려지는 찰나에 화면이 미세하게 깜빡이거나 축소되었다가 팽창하는 현상.
+    - **발생 원인:** `react-zoom-pan-pinch` 라이브러리의 `setTransform()` API가 내부적으로 CSS `transition` 속성을 재설정할 수 있으며, `applyZoomWithAnchor`나 `handleFit`에서 CSS transform을 `""`으로 초기화할 때 브라우저가 이전 배율에서 1.0으로 줄어드는 전환 애니메이션을 발동시켜 시각적 깜빡임을 유발함.
+    - **해결 로직:**
+      - **`applyZoomWithAnchor` 함수:** CSS transform 초기화 직전, `setTransform(0,0,1,0)` 호출 직후, 그리고 `flushSync` 이후의 **3개 지점** 모두에서 `style.setProperty("transition", "none", "important")`를 강제 주입하여 어떤 경로에서든 전환 애니메이션이 끼어들 수 없도록 완벽 차단함.
+      - **`handleFit` 함수:** 동일하게 transform 초기화 전에 transition을 차단하여 Fit 버튼 클릭 시의 깜빡임도 제거함.
+      - **`onTransform` 콜백 최적화:** 핀치 줌 중 초당 수십 회 호출되는 `onTransform`에서 `scaleDisplayRef.current.innerText` 할당 전에 이전 값과 동일한지 비교하는 가드를 추가하여 불필요한 DOM 텍스트 노드 교체와 미세 리플로우를 방지함.
+      - **페이지 래퍼 크기 사전 고정:** 단일 보기 및 연속 보기 모드의 페이지 래퍼 `div`에 `pageBaseWidth`와 `pageBaseHeight` 비율 기반의 명시적 `width`/`height`를 사전 부여하여, `react-pdf` 캔버스가 비동기로 그려지기 전에도 레이아웃이 확정되어 스크롤 좌표 재계산이 정확해지고 레이아웃 시프트(Layout Shift)에 의한 시각적 튕김을 방지함.
+
 ### **메타데이터 하이브리드 동기화 (Hybrid Sync Engine) 구조 개선**
 다중 기기(PC/모바일) 환경에서 메모와 책갈피를 오차 없이 동기화하기 위해 다음과 같은 고도화된 아키텍처가 적용되었습니다.
 
