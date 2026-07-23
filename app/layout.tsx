@@ -24,6 +24,11 @@ export const metadata: Metadata = {
   title: "eBook 리더기",
   description: "PWA Smart Reading App with Gemini AI",
   manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Simple Reader",
+  },
   icons: {
     icon: "/icons/icon-192x192.png",
     apple: "/icons/icon-192x192.png",

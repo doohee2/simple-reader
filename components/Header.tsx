@@ -3,6 +3,7 @@
 import { Library, X } from "lucide-react";
 import { signIn, signOut, useSession } from "next-auth/react";
 import { useRef, useState } from "react";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import DrivePickerModal from "./DrivePickerModal";
 import StorageManagerModal from "./StorageManagerModal";
 import BookInfoModal from "./BookInfoModal";
@@ -15,6 +16,8 @@ export default function Header() {
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [isBookInfoModalOpen, setIsBookInfoModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { isOnline } = useNetworkStatus();
+  const [isUpdating, setIsUpdating] = useState(false);
   
   const { 
     selectedFileId,
@@ -95,6 +98,13 @@ export default function Header() {
                 </button>
               </div>
             </>
+          )}
+          {/* 오프라인 뱃지 */}
+          {!isOnline && (
+            <div className="flex items-center gap-1 bg-error/15 text-error border border-error/30 px-2 py-1 rounded-full text-[11px] font-bold flex-shrink-0 animate-pulse">
+              <span className="material-symbols-outlined text-[14px]">cloud_off</span>
+              <span className="hidden sm:inline">오프라인</span>
+            </div>
           )}
         </div>
 
@@ -212,8 +222,37 @@ export default function Header() {
             <p className="text-ui-body text-on-surface mb-6 leading-relaxed">
               {APP_INFO.DESCRIPTION}
             </p>
-            <div className="text-right border-t border-outline-variant pt-4 mt-2">
-              <p className="text-ui-label-sm text-on-surface-variant font-medium">
+            <div className="border-t border-outline-variant pt-4 mt-2 space-y-3">
+              <button
+                onClick={async () => {
+                  if (!confirm("앱 캐시를 초기화하고 최신 버전으로 업데이트합니다. PDF 데이터와 메모는 유지됩니다.")) return;
+                  setIsUpdating(true);
+                  try {
+                    // 1. 모든 서비스 워커 등록 해제
+                    if ("serviceWorker" in navigator) {
+                      const registrations = await navigator.serviceWorker.getRegistrations();
+                      await Promise.all(registrations.map(r => r.unregister()));
+                    }
+                    // 2. 모든 캐시 스토리지 삭제
+                    const cacheNames = await caches.keys();
+                    await Promise.all(cacheNames.map(name => caches.delete(name)));
+                    // 3. 강제 새로고침
+                    window.location.reload();
+                  } catch (err) {
+                    console.error("캐시 초기화 실패:", err);
+                    setIsUpdating(false);
+                    alert("업데이트에 실패했습니다. 페이지를 새로고침해 주세요.");
+                  }
+                }}
+                disabled={isUpdating}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-lg transition-colors text-ui-label-bold disabled:opacity-50"
+              >
+                <span className={`material-symbols-outlined text-[18px] ${isUpdating ? 'animate-spin' : ''}`}>
+                  {isUpdating ? 'progress_activity' : 'system_update_alt'}
+                </span>
+                {isUpdating ? '업데이트 중...' : '최신 버전으로 업데이트'}
+              </button>
+              <p className="text-ui-label-sm text-on-surface-variant font-medium text-right">
                 {APP_INFO.VERSION}
               </p>
             </div>

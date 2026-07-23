@@ -31,7 +31,8 @@
 ```text
 simple-reader/
 ├── app/
-│   ├── layout.tsx         # 전역 레이아웃. PWA Manifest, 폰트(Inter, Merriweather), NextAuth Provider 세팅
+│   ├── layout.tsx         # 전역 레이아웃. PWA Manifest, Apple Web App 메타데이터, 폰트(Inter, Merriweather), NextAuth Provider 세팅
+│   ├── sw.ts              # Serwist 서비스 워커. 자산별 캐싱 전략(CacheFirst/StaleWhileRevalidate/NetworkFirst) 정의
 │   ├── page.tsx           # 메인 페이지 진입점. Header와 Workspace를 렌더링
 │   ├── globals.css        # Tailwind CSS 지시어 및 테마 색상(디자인 시스템) 토큰 정의
 │   └── api/               # 백엔드 API 라우트
@@ -41,7 +42,7 @@ simple-reader/
 │       └── translate/route.ts          # 제미나이 AI 번역/요약 요청 및 Streaming ReadableStream 반환
 ├── components/
 │   ├── Providers.tsx      # NextAuth의 SessionProvider를 App Router 환경에 래핑
-│   ├── Header.tsx         # 상단 헤더. 파일명 표시, 구글 로그인/로그아웃 버튼, 파일 열기 액션 연결
+│   ├── Header.tsx         # 상단 헤더. 파일명 표시, 오프라인 뱃지, 로그인/로그아웃 버튼, 앱 정보 모달(SW 캐시 업데이트 포함)
 │   ├── DrivePickerModal.tsx # 구글 드라이브 탐색 모달창 (특정 폴더를 '내 서재'로 지정 및 중첩 폴더 탐색 기능 포함)
 │   ├── StorageManagerModal.tsx # 로컬 저장소 관리자 UI (메타데이터는 보존하며 대용량 PDF 바이너리 캐시만 선택 삭제)
 │   ├── Workspace.tsx      # 메인 작업 영역. 데스크탑은 좌우 분할, 모바일은 상하 분할(BottomSheet) 레이아웃 적용
@@ -51,7 +52,8 @@ simple-reader/
 │   └── BottomNavBar.tsx   # 모바일 환경 전용 하단 네비게이션 도구 모음
 ├── hooks/
 │   ├── usePdfFile.ts      # Dexie.js 로컬 캐시를 1순위로 확인하고, 없으면 Google API로 다운로드하는 최적화 훅
-│   └── useMetadataSync.ts # Dexie.js(로컬)와 Supabase(클라우드) 간의 메모/책갈피 하이브리드 동기화 로직 훅
+│   ├── useMetadataSync.ts # Dexie.js(로컬)와 Supabase(클라우드) 간의 메모/책갈피 하이브리드 동기화 로직 훅
+│   └── useNetworkStatus.ts # 브라우저 online/offline 이벤트 기반 네트워크 상태 감지 훅
 ├── store/
 │   └── useStore.ts        # Zustand 전역 상태. 현재 열린 파일 ID, 선택된 텍스트, 페이지 번호 등을 컴포넌트 간 공유
 ├── lib/
@@ -204,3 +206,26 @@ simple-reader/
    - **브라우저 네이티브 탐색기 연동:** 로그아웃 상태일 경우 구글 드라이브 모달 대신 브라우저 기본 파일 선택기(`<input type="file">`)를 호출하여, 로컬 기기의 PDF를 즉시 `Dexie` 캐시로 복사 및 렌더링합니다.
    - **클라우드 동기화 원천 차단:** 로컬에서 직접 불러온 파일은 `local-` 접두사가 붙은 고유 ID를 부여받습니다. 이 파일에서 작성된 메모나 책갈피는 사용자가 이후 로그인을 하더라도 백그라운드 봇(`manualSync`)이 의도적으로 동기화를 건너뛰어(Bypass) 기기 밖으로 데이터가 유출되는 것을 방지합니다.
    - **시각적 UI 분리:** '내 서재' 모달 내에서 로컬 전용 파일은 별도의 기기(Monitor) 아이콘 및 전용 배지로 표시되어, 구글 드라이브 연동 파일과 직관적으로 구분할 수 있습니다.
+
+### **PWA 오프라인 우선(Offline-First) 아키텍처**
+네트워크가 불안정하거나 완전히 끊긴 환경에서도 앱이 0.1초 컷으로 화면을 띄우고, 모든 핵심 기능(PDF 열람, 메모, 책갈피)이 정상 작동하도록 다음과 같은 아키텍처가 적용되었습니다.
+
+1. **서비스 워커 캐싱 전략 (`sw.ts`)**
+   - Serwist(Workbox 후속)의 `defaultCache`를 제거하고, 자산 유형별로 4가지 런타임 캐싱 전략을 명시적으로 설정함.
+   - **정적 자산** (JS/CSS/폰트/이미지): `CacheFirst` — 해시가 포함된 빌드 산출물이므로 캐시 우선이 안전하고 가장 빠름. `maxEntries: 128`, `maxAge: 1년`.
+   - **HTML 문서** (`request.mode === 'navigate'`): `StaleWhileRevalidate` — 캐시된 앱 셸을 즉시 보여주고 백그라운드에서 최신 버전을 갱신. 오프라인에서도 멈춤 없이 화면 표시.
+   - **Next.js RSC 데이터** (`_rsc`, `_next/data`): `StaleWhileRevalidate` — 오프라인에서도 페이지 전환이 멈추지 않도록 캐시된 RSC 페이로드를 즉시 반환.
+   - **API 호출** (`/api/`): `NetworkFirst` (5초 타임아웃) — 최신 데이터 우선, 오프라인 시 캐시 폴백.
+
+2. **iOS Standalone 앱 지원 (`layout.tsx`)**
+   - `Metadata.appleWebApp` 속성에 `capable: true`, `statusBarStyle: "black-translucent"`, `title: "Simple Reader"`를 설정하여 아이폰 Safari에서 홈 화면에 추가 시 전체 화면 독립 앱으로 동작.
+
+3. **네트워크 상태 감지 및 오프라인 뱃지 (`useNetworkStatus.ts`, `Header.tsx`)**
+   - `window.addEventListener('online'/'offline')`을 활용한 커스텀 훅으로 실시간 연결 상태를 추적.
+   - 오프라인 감지 시 헤더 좌측에 `cloud_off` 아이콘 + "오프라인" 텍스트의 빨간색 펄스 뱃지를 표시하여 사용자에게 즉각적인 시각 피드백 제공.
+   - 다시 온라인이 되면 뱃지가 자동으로 사라짐.
+
+4. **서비스 워커 캐시 수동 업데이트 (앱 정보 모달)**
+   - 앱 정보 모달 하단에 "최신 버전으로 업데이트" 버튼을 배치.
+   - `navigator.serviceWorker.getRegistrations()`으로 모든 SW 등록 해제 → `caches.keys()`로 모든 캐시 스토리지 삭제 → `window.location.reload()`로 강제 새로고침.
+   - IndexedDB(Dexie.js)에 저장된 PDF 데이터와 메모/책갈피는 영향을 받지 않으며, SW 캐시(HTML/JS/CSS)만 초기화됨.
