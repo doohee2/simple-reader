@@ -248,7 +248,7 @@ simple-reader/
 
 4. **Vercel 배포용 6대 철통 HTTP 보안 헤더 (`next.config.ts`)**
    - `next.config.ts`의 `async headers()` 설정을 통해 전역 라우트(`/:path*`)에 다음 **6대 강력 보안 헤더**를 자동으로 삽입하여 공격 시도를 원천 봉쇄합니다.
-     - **`Content-Security-Policy` (CSP):** `worker-src 'self' blob:;` (PWA 및 react-pdf 워커 구동 허용) 및 `connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://*.supabase.co wss://*.supabase.co data: blob:;` 등을 통해 명시된 승인 도메인 및 워커 외의 불법 데이터 유출 및 XSS 차단.
+     - **`Content-Security-Policy` (CSP):** `worker-src` 및 `script-src`, `connect-src`에 `'self' blob: data: https://unpkg.com https://cdn.jsdelivr.net`을 허용하여 `react-pdf`(`pdfjs-dist`)의 CDN 웹 워커 구동이 PC/모바일 환경 모두에서 차단되지 않도록 보호하고, 구글 Auth 및 Supabase 등 승인된 도메인 외의 불법 통신과 XSS를 철저히 방어합니다.
      - **`Strict-Transport-Security` (HSTS):** `max-age=63072000; includeSubDomains; preload` (무조건 HTTPS 암호화 통신 강제).
      - **`X-Frame-Options`:** `DENY` (타 사이트 iframe 인가 차단 및 클릭재킹 방어).
      - **`X-Content-Type-Options`:** `nosniff` (MIME 스푸핑 통제).
