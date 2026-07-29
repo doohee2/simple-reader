@@ -1,25 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
+import { auth } from "@/auth";
+import { z } from "zod";
 
 const apiKey = process.env.GEMINI_API_KEY;
 
+const TranslateBodySchema = z.object({
+  text: z.string().trim().min(1),
+  mode: z.enum(["translate", "summary"]).optional().default("translate"),
+  customPrompt: z.string().optional().default(""),
+  model: z.string().optional().default("gemini-flash-latest"),
+});
+
 export async function POST(request: NextRequest) {
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "GEMINI_API_KEY is not configured on the server." },
-      { status: 500 }
-    );
-  }
-
   try {
-    const { text, mode, customPrompt, model } = await request.json();
-
-    if (!text || text.trim() === "") {
+    const session = await auth();
+    if (!session || !session.user) {
       return NextResponse.json(
-        { error: "Text is required for translation." },
+        { error: "요청을 처리할 수 없습니다." },
+        { status: 401 }
+      );
+    }
+
+    if (!apiKey) {
+      console.error("Server Error: GEMINI_API_KEY is not configured.");
+      return NextResponse.json(
+        { error: "요청을 처리할 수 없습니다." },
+        { status: 500 }
+      );
+    }
+
+    const rawBody = await request.json().catch(() => null);
+    const parsedBody = TranslateBodySchema.safeParse(rawBody);
+
+    if (!parsedBody.success) {
+      return NextResponse.json(
+        { error: "요청을 처리할 수 없습니다." },
         { status: 400 }
       );
     }
+
+    const { text, mode, customPrompt, model } = parsedBody.data;
 
     const ai = new GoogleGenAI({ apiKey });
     let prompt =
@@ -48,7 +69,7 @@ export async function POST(request: NextRequest) {
             }
           }
           controller.close();
-        } catch (err: any) {
+        } catch (err: unknown) {
           console.error("Stream error:", err);
           controller.error(err);
         }
@@ -61,10 +82,10 @@ export async function POST(request: NextRequest) {
         "Transfer-Encoding": "chunked",
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Translation API Error:", error);
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      { error: "요청을 처리할 수 없습니다." },
       { status: 500 }
     );
   }

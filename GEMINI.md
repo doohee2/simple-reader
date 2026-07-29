@@ -229,3 +229,28 @@ simple-reader/
    - 앱 정보 모달 하단에 "최신 버전으로 업데이트" 버튼을 배치.
    - `navigator.serviceWorker.getRegistrations()`으로 모든 SW 등록 해제 → `caches.keys()`로 모든 캐시 스토리지 삭제 → `window.location.reload()`로 강제 새로고침.
    - IndexedDB(Dexie.js)에 저장된 PDF 데이터와 메모/책갈피는 영향을 받지 않으며, SW 캐시(HTML/JS/CSS)만 초기화됨.
+
+### **6. 아키텍처 보안 하드닝 및 4단계 방어 설계 (Security & Hardening)**
+클라이언트(브라우저) 환경과 서버리스 API 경계 간의 철저한 격리 및 방어를 위해 4단계 보안 점검 체크리스트를 완수하여 무결성을 확보했습니다.
+
+1. **서버 엔드포인트 인가(Authorization) 및 Zod 입력 검증**
+   - **리소스 소유권 보호:** 모든 API 라우트(`app/api/drive/list`, `app/api/drive/download`, `app/api/translate`)는 클라이언트가 보낸 파라미터를 무조건 신뢰하지 않고 오직 서버 측 세션(`await auth()`)에서 검증된 자격증명(`accessToken` 및 세션 존재 여부)만을 기준으로 API 및 서비스 접근을 통제합니다. 특히 `/api/translate` 엔드포인트에 `auth()` 검증을 의무 도입하여 비인가 사용자가 서버의 `GEMINI_API_KEY`를 직접 남용하는 취약점을 해소했습니다.
+   - **엄격한 Zod 스키마 검증:** `zod` 라이브러리를 도입하여 모든 요청의 Body 및 Query Params(`fileId`, `folderId`, `text`, `mode`, `model` 등)에 대해 `.safeParse()`를 통한 정규화·검증을 강제 적용하고, 규격 외 요청 시 즉시 HTTP 400 에러를 반환합니다.
+   - **에러 메시지 위생화(Error Sanitization):** 외부 통신 실패나 내부 예외 시 상세 스택 트레이스 및 오류 원문은 오직 터미널·서버 로그(`console.error`)에만 기록하고, 브라우저로 반환되는 응답문은 **`"요청을 처리할 수 없습니다."`**로 규격을 100% 통일하여 내부 정보 누출을 봉쇄했습니다.
+
+2. **환경변수 격리(Zero-Leak) 및 비밀자격 관리**
+   - **백엔드 시크릿 노출 방지:** `GEMINI_API_KEY`, `GOOGLE_CLIENT_SECRET`, `NEXTAUTH_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` 등 기밀 서비스 시크릿에 `NEXT_PUBLIC_` 접두사가 유출되지 않는지 정기 검증(Zero-Leak)합니다. 
+   - **배포 대시보드 주의 안내:** Vercel 등 호스팅 대시보드 설정 시에도 기밀 자격정보는 무의미하게 클라이언트 번들에 혼합되지 않도록 반드시 순수 백엔드 변수로만 지정해야 합니다. (단, Supabase Anon Key는 PostgreSQL RLS 정책 아래 브라우저 측 Dexie 하이브리드 싱크 구동용이므로 `NEXT_PUBLIC_`를 적법하게 유지합니다).
+
+3. **PWA 오프라인 캐시 및 인증 토큰 로컬 보안 (Cache Purging)**
+   - **인증 토큰 격리:** Access Token 및 JWT 세션은 `localStorage`나 `IndexedDB`에 평문으로 절대 저장하지 않고 오직 NextAuth가 제어하는 **HttpOnly 암호화 쿠키**로 보호합니다.
+   - **로그아웃 시 민감 캐시 폭파 방어막:** 공공 장소나 타인 기기에서 사용자 로그아웃(`Header.tsx`)을 하거나 토큰 만료(`Workspace.tsx`) 이벤트 발생 시 **`window.caches.keys()`를 순회하여 `window.caches.delete`로 서비스 워커가 저장해둔 로컬 오프라인 캐시 스토리지까지 완벽히 클리어·파괴**하는 핸들러 로직을 적용했습니다. (오프라인 사용 중에는 원래대로 서비스 워커 캐싱 100% 정상 작동)
+
+4. **Vercel 배포용 6대 철통 HTTP 보안 헤더 (`next.config.ts`)**
+   - `next.config.ts`의 `async headers()` 설정을 통해 전역 라우트(`/:path*`)에 다음 **6대 강력 보안 헤더**를 자동으로 삽입하여 공격 시도를 원천 봉쇄합니다.
+     - **`Content-Security-Policy` (CSP):** `worker-src 'self' blob:;` (PWA 및 react-pdf 워커 구동 허용) 및 `connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://*.supabase.co wss://*.supabase.co data: blob:;` 등을 통해 명시된 승인 도메인 및 워커 외의 불법 데이터 유출 및 XSS 차단.
+     - **`Strict-Transport-Security` (HSTS):** `max-age=63072000; includeSubDomains; preload` (무조건 HTTPS 암호화 통신 강제).
+     - **`X-Frame-Options`:** `DENY` (타 사이트 iframe 인가 차단 및 클릭재킹 방어).
+     - **`X-Content-Type-Options`:** `nosniff` (MIME 스푸핑 통제).
+     - **`Referrer-Policy`:** `strict-origin-when-cross-origin` (민감 경로 및 파라미터 유출 막기).
+     - **`Permissions-Policy`:** `camera=(), microphone=(), geolocation=()` (불필요 하드웨어 권한 조기 제한).

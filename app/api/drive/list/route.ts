@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { z } from "zod";
+
+const DriveListQuerySchema = z.object({
+  folderId: z.string().trim().min(1).default("root"),
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,11 +13,19 @@ export async function GET(request: NextRequest) {
     const accessToken = session?.accessToken;
 
     if (!session || !accessToken) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "요청을 처리할 수 없습니다." }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
-    const folderId = searchParams.get("folderId") || "root";
+    const parsedQuery = DriveListQuerySchema.safeParse({
+      folderId: searchParams.get("folderId") || undefined,
+    });
+
+    if (!parsedQuery.success) {
+      return NextResponse.json({ error: "요청을 처리할 수 없습니다." }, { status: 400 });
+    }
+
+    const { folderId } = parsedQuery.data;
 
     const query = `'${folderId}' in parents and (mimeType='application/vnd.google-apps.folder' or mimeType='application/pdf') and trashed=false`;
     const fields = "files(id, name, modifiedTime, size, mimeType)";
@@ -27,9 +40,11 @@ export async function GET(request: NextRequest) {
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Google Drive API list failed:", response.status, errorText);
       return NextResponse.json(
-        { error: "Failed to fetch files from Google Drive." },
-        { status: response.status }
+        { error: "요청을 처리할 수 없습니다." },
+        { status: response.status >= 400 && response.status < 500 ? response.status : 500 }
       );
     }
 
@@ -37,6 +52,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error listing drive files:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({ error: "요청을 처리할 수 없습니다." }, { status: 500 });
   }
 }

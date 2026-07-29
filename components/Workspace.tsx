@@ -35,6 +35,9 @@ export default function Workspace() {
 
   useEffect(() => {
     if (session?.error === "RefreshAccessTokenError") {
+      if ('caches' in window) {
+        window.caches.keys().then(names => Promise.all(names.map(name => window.caches.delete(name)))).catch(err => console.error("Cache purge failed on session expired:", err));
+      }
       signIn("google", { prompt: "login" }); // Force sign in to obtain a new set of tokens
     }
   }, [session]);

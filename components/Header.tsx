@@ -60,6 +60,19 @@ export default function Header() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const handleSignOut = async () => {
+    try {
+      if ('caches' in window) {
+        const cacheNames = await window.caches.keys();
+        await Promise.all(cacheNames.map(name => window.caches.delete(name)));
+      }
+    } catch (e) {
+      console.error("Cache purge failed during logout:", e);
+    } finally {
+      signOut();
+    }
+  };
+
   const iconButtonClass = "w-9 h-9 md:w-10 md:h-10 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors duration-200 rounded-full hover:bg-surface-variant flex-shrink-0";
   const iconClass = "material-symbols-outlined text-[22px] md:text-[24px]";
 
@@ -159,7 +172,7 @@ export default function Header() {
           {/* 인증 상태에 따른 버튼들 */}
           {status === "authenticated" ? (
             <button 
-              onClick={() => signOut()}
+              onClick={handleSignOut}
               className={`${iconButtonClass} p-0 border-2 border-transparent hover:border-primary group relative`}
               title="로그아웃"
             >
