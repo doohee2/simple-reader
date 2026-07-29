@@ -222,10 +222,10 @@ simple-reader/
 2. **iOS Standalone 앱 지원 (`layout.tsx`)**
    - `Metadata.appleWebApp` 속성에 `capable: true`, `statusBarStyle: "black-translucent"`, `title: "Simple Reader"`를 설정하여 아이폰 Safari에서 홈 화면에 추가 시 전체 화면 독립 앱으로 동작.
 
-3. **네트워크 상태 감지 및 오프라인 뱃지 (`useNetworkStatus.ts`, `Header.tsx`)**
-   - `window.addEventListener('online'/'offline')`을 활용한 커스텀 훅으로 실시간 연결 상태를 추적.
-   - 오프라인 감지 시 헤더 좌측에 `cloud_off` 아이콘 + "오프라인" 텍스트의 빨간색 펄스 뱃지를 표시하여 사용자에게 즉각적인 시각 피드백 제공.
-   - 다시 온라인이 되면 뱃지가 자동으로 사라짐.
+3. **하이브리드 능동 회선 판독기 및 무한 스피너 방어 (`useNetworkStatus.ts`, `Providers.tsx`, `Header.tsx`)**
+   - `navigator.onLine` 초기값 0초 컷 동기 심검 후, 가짜 온라인 신호나 서비스 워커의 위조 캐시에 속지 않도록 `/manifest.json?_t=${Date.now()}`에 대해 `method: "HEAD", cache: "no-store"`(1.2초 타임아웃) 능동 핑을 15초 주기 및 `onfocus`/`ononline` 이벤트마다 실행하여 실제 통신 여부를 정확히 판독함.
+   - `Providers.tsx`에 `@tanstack/react-query`의 `QueryClientProvider`를 장착하여 오프라인 감지 시 즉각 네트워크 재시도(`retry: 0` / `false`)를 0초 컷 차단, 초기 무한 스피너를 폭파하고 로컬 캐시로 즉시 진입함. 온라인 회복 시에는 `refetchOnReconnect: true` 및 `SessionProvider`의 `refetchWhenOffline={false}` 설정을 통해 최신 데이터로 실시간 자동 회복됨.
+   - 오프라인 감지 시 헤더 좌측에 `cloud_off` 아이콘 + "오프라인" 텍스트의 빨간색 펄스 뱃지를 표시하여 즉각적인 시각 피드백 제공.
 
 4. **서비스 워커 캐시 수동 업데이트 (앱 정보 모달)**
    - 앱 정보 모달 하단에 "최신 버전으로 업데이트" 버튼을 배치.
