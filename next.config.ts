@@ -3,11 +3,11 @@ import withSerwistInit from "@serwist/next";
 
 const cspHeader = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://www.gstatic.com https://unpkg.com https://cdn.jsdelivr.net blob: data:",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com https://cdn.jsdelivr.net",
-  "img-src 'self' data: blob: https:",
-  "font-src 'self' data: https://fonts.gstatic.com https://unpkg.com https://cdn.jsdelivr.net",
-  "connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://*.supabase.co wss://*.supabase.co https://unpkg.com https://cdn.jsdelivr.net data: blob:",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://www.gstatic.com https://*.gstatic.com https://*.googleapis.com https://unpkg.com https://cdn.jsdelivr.net blob: data:",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.googleapis.com https://*.gstatic.com https://unpkg.com https://cdn.jsdelivr.net",
+  "img-src 'self' data: blob: https: https://*.googleusercontent.com https://*.ggpht.com https://*.gstatic.com https://*.googleapis.com",
+  "font-src 'self' data: https://fonts.gstatic.com https://*.gstatic.com https://*.googleapis.com https://*.googleusercontent.com https://*.ggpht.com https://unpkg.com https://cdn.jsdelivr.net",
+  "connect-src 'self' https://*.googleapis.com https://*.gstatic.com https://*.googleusercontent.com https://*.ggpht.com https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://*.supabase.co wss://*.supabase.co https://unpkg.com https://cdn.jsdelivr.net data: blob:",
   "worker-src 'self' blob: data: https://unpkg.com https://cdn.jsdelivr.net",
   "child-src 'self' blob: data: https://unpkg.com https://cdn.jsdelivr.net",
   "frame-src 'self' https://accounts.google.com",

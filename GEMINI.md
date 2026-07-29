@@ -210,12 +210,14 @@ simple-reader/
 ### **PWA 오프라인 우선(Offline-First) 아키텍처**
 네트워크가 불안정하거나 완전히 끊긴 환경에서도 앱이 0.1초 컷으로 화면을 띄우고, 모든 핵심 기능(PDF 열람, 메모, 책갈피)이 정상 작동하도록 다음과 같은 아키텍처가 적용되었습니다.
 
-1. **서비스 워커 캐싱 전략 (`sw.ts`)**
-   - Serwist(Workbox 후속)의 `defaultCache`를 제거하고, 자산 유형별로 4가지 런타임 캐싱 전략을 명시적으로 설정함.
-   - **정적 자산** (JS/CSS/폰트/이미지): `CacheFirst` — 해시가 포함된 빌드 산출물이므로 캐시 우선이 안전하고 가장 빠름. `maxEntries: 128`, `maxAge: 1년`.
+1. **서비스 워커 캐싱 전략, 외부 리소스 격리 및 아이콘 FOUT 방어 (`sw.ts`, `app/layout.tsx`, `Header.tsx`)**
+   - Serwist(Workbox 후속)의 런타임 캐싱 전략을 자산 유형 및 Origin 특성에 따라 5가지로 정밀하게 분리 적용함.
+   - **외부(Cross-Origin) 도메인 리소스** (구글 폰트/스타일, 구글 OAuth 아바타, 외부 CDN 등): `StaleWhileRevalidate` — 정적 자산 규칙보다 상위에 배치하여 구글 프로필 및 Material Symbols 폰트 등이 오프라인에서도 보이며 백그라운드에서 유연하게 갱신됨. Opaque(상태코드 0) 응답 충돌 방지 및 영구 박제 차단을 위해 `CacheableResponsePlugin({ statuses: [0, 200] })` 및 유효기한 30일(`maxAgeSeconds: 30일`) 명시.
+   - **내부(Self Origin) 정적 고정 자산** (`/_next/static/**`, 내부 JS/CSS/폰트/로컬 이미지): `CacheFirst` — 당사 빌드 산출물 및 불변 정적 자산은 1년짜리(`maxAgeSeconds: 1년`) CacheFirst 정책을 확실히 유지하여 제로 레이턴시 오프라인 즉각 로딩 실현.
    - **HTML 문서** (`request.mode === 'navigate'`): `StaleWhileRevalidate` — 캐시된 앱 셸을 즉시 보여주고 백그라운드에서 최신 버전을 갱신. 오프라인에서도 멈춤 없이 화면 표시.
    - **Next.js RSC 데이터** (`_rsc`, `_next/data`): `StaleWhileRevalidate` — 오프라인에서도 페이지 전환이 멈추지 않도록 캐시된 RSC 페이로드를 즉시 반환.
    - **API 호출** (`/api/`): `NetworkFirst` (5초 타임아웃) — 최신 데이터 우선, 오프라인 시 캐시 폴백.
+   - **아이콘 글자 깜빡임(FOUT) 및 엑박 방어 UX:** `app/layout.tsx`에서 Google Fonts 및 Material Symbols 로딩 시 Preconnect(`https://fonts.googleapis.com`, `https://fonts.gstatic.com`)를 추가하고 파라미터를 `display=block`으로 설정하여 아이콘 다운로드 전 `search`, `calendar_month` 등 원문 글자 텍스트가 깜빡거리며 화면에 노출되는 FOUT 현상을 차단함. `Header.tsx`에서는 아바타 로딩 실패 시 `onError` 핸들러로 `account_circle` 기본 아이콘 전환을 지원함.
 
 2. **iOS Standalone 앱 지원 (`layout.tsx`)**
    - `Metadata.appleWebApp` 속성에 `capable: true`, `statusBarStyle: "black-translucent"`, `title: "Simple Reader"`를 설정하여 아이폰 Safari에서 홈 화면에 추가 시 전체 화면 독립 앱으로 동작.
@@ -248,7 +250,7 @@ simple-reader/
 
 4. **Vercel 배포용 6대 철통 HTTP 보안 헤더 (`next.config.ts`)**
    - `next.config.ts`의 `async headers()` 설정을 통해 전역 라우트(`/:path*`)에 다음 **6대 강력 보안 헤더**를 자동으로 삽입하여 공격 시도를 원천 봉쇄합니다.
-     - **`Content-Security-Policy` (CSP):** `worker-src` 및 `script-src`, `connect-src`에 `'self' blob: data: https://unpkg.com https://cdn.jsdelivr.net`을 허용하여 `react-pdf`(`pdfjs-dist`)의 CDN 웹 워커 구동이 PC/모바일 환경 모두에서 차단되지 않도록 보호하고, 구글 Auth 및 Supabase 등 승인된 도메인 외의 불법 통신과 XSS를 철저히 방어합니다.
+     - **`Content-Security-Policy` (CSP):** `connect-src`, `font-src`, `img-src` 및 `script-src`, `style-src` 등에 필수 외부 도메인(`https://*.gstatic.com`, `https://*.googleapis.com`, `https://*.googleusercontent.com`, `https://*.ggpht.com` 등)과 `worker-src`/`child-src` CDN(`unpkg.com`, `cdn.jsdelivr.net`)을 개방하여 서비스 워커의 백그라운드 폰트/아바타 Fetch 및 PC/모바일 PDF CDN 웹 워커 구동이 차단되지 않도록 보장하면서 불법적인 Cross-Site 통신을 완벽 차단합니다.
      - **`Strict-Transport-Security` (HSTS):** `max-age=63072000; includeSubDomains; preload` (무조건 HTTPS 암호화 통신 강제).
      - **`X-Frame-Options`:** `DENY` (타 사이트 iframe 인가 차단 및 클릭재킹 방어).
      - **`X-Content-Type-Options`:** `nosniff` (MIME 스푸핑 통제).

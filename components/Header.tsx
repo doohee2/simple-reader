@@ -18,6 +18,7 @@ export default function Header() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { isOnline } = useNetworkStatus();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [imgError, setImgError] = useState(false);
   
   const { 
     selectedFileId,
@@ -176,8 +177,13 @@ export default function Header() {
               className={`${iconButtonClass} p-0 border-2 border-transparent hover:border-primary group relative`}
               title="로그아웃"
             >
-              {session.user?.image ? (
-                <img src={session.user.image} alt="Profile" className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover" />
+              {session.user?.image && !imgError ? (
+                <img 
+                  src={session.user.image} 
+                  alt="Profile" 
+                  className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover" 
+                  onError={() => setImgError(true)}
+                />
               ) : (
                 <span className={iconClass}>account_circle</span>
               )}
