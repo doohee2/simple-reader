@@ -23,18 +23,32 @@ export interface PdfMetadata {
   isUnsynced?: boolean;
 }
 
+// 3. AI History Table Interface
+export interface AiHistory {
+  id: string;
+  fileId: string;
+  type: 'translate' | 'summary';
+  selectedText: string;
+  result: string;
+  createdAt: string;
+  page: number;
+}
+
 const db = new Dexie('SimpleReaderDB') as Dexie & {
   pdfCache: EntityTable<PdfCache, 'fileId'>;
   pdfMetadata: EntityTable<PdfMetadata, 'id'>;
+  aiHistory: EntityTable<AiHistory, 'id'>;
 };
 
 // 스키마 선언
-db.version(3).stores({
+db.version(4).stores({
   pdfCache: 'fileId', // Primary key is fileId
   pdfMetadata: 'id, fileId, type', // Primary key is id, indexed by fileId and type
+  aiHistory: 'id, fileId, createdAt',
 }).upgrade(() => {
   // Version 2: Add fileName field to pdfCache
-  // Version 3: Add deletedAt field to pdfMetadata (not indexed, so no stores string change)
+  // Version 3: Add deletedAt field to pdfMetadata
+  // Version 4: Add aiHistory table
 });
 
 export default db;

@@ -4,6 +4,8 @@ import { Loader2 } from "lucide-react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useStore } from "@/store/useStore";
 import { useMetadataSync } from "@/hooks/useMetadataSync";
+import { useLiveQuery } from "dexie-react-hooks";
+import db from "@/lib/db";
 
 interface AiAssistantPanelProps {
   forceTab?: "ai" | "memo";
@@ -36,6 +38,12 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
 
   const [isAddingMemo, setIsAddingMemo] = useState(false);
   const [newMemoContent, setNewMemoContent] = useState("");
+
+  const [isViewingHistory, setIsViewingHistory] = useState(false);
+  const aiHistoryList = useLiveQuery(
+    () => selectedFileId ? db.aiHistory.where("fileId").equals(selectedFileId).reverse().sortBy("createdAt") : Promise.resolve([] as any[]),
+    [selectedFileId]
+  ) || [];
 
   const adjustTextareaHeight = useCallback(() => {
     if (textareaRef.current) {
@@ -81,12 +89,33 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
       const decoder = new TextDecoder("utf-8");
       
       let done = false;
+      let fullResult = "";
       while (!done) {
         const { value, done: readerDone } = await reader.read();
         done = readerDone;
         if (value) {
           const chunk = decoder.decode(value, { stream: true });
+          fullResult += chunk;
           setTranslationResult((prev) => prev + chunk);
+        }
+      }
+
+      if (selectedFileId && fullResult.trim()) {
+        await db.aiHistory.add({
+          id: crypto.randomUUID(),
+          fileId: selectedFileId,
+          type: mode,
+          selectedText,
+          result: fullResult.trim(),
+          createdAt: new Date().toISOString(),
+          page: currentPage
+        });
+        
+        const count = await db.aiHistory.where("fileId").equals(selectedFileId).count();
+        if (count > 50) {
+          const oldItems = await db.aiHistory.where("fileId").equals(selectedFileId).sortBy("createdAt");
+          const itemsToDelete = oldItems.slice(0, count - 50).map(item => item.id);
+          await db.aiHistory.bulkDelete(itemsToDelete);
         }
       }
     } catch (err: unknown) {
@@ -94,7 +123,7 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
     } finally {
       setIsTranslating(false);
     }
-  }, [selectedText, customPrompt, selectedModel]);
+  }, [selectedText, customPrompt, selectedModel, selectedFileId, currentPage]);
 
   // actionIntent 감지 (툴팁에서 액션 발생 시)
   useEffect(() => {
@@ -174,13 +203,64 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
       {/* Tab Content */}
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 custom-scrollbar">
         {activeTab === "ai" && (
-          <>
-            {/* Source Quote */}
-            <div className="flex flex-col gap-2">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <span className="text-ui-label-sm text-on-surface-variant uppercase tracking-wider">선택된 문장</span>
-                  {selectedText && (
+          isViewingHistory ? (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-2 mb-2">
+                <button onClick={() => setIsViewingHistory(false)} className="p-1 hover:bg-surface-variant rounded-full text-on-surface transition-colors flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+                </button>
+                <span className="text-title-sm font-bold text-on-surface">AI 내역 조회</span>
+              </div>
+              {aiHistoryList.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-on-surface-variant">
+                  <span className="material-symbols-outlined text-4xl mb-2 opacity-50">history</span>
+                  <p className="text-sm">저장된 내역이 없습니다.</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {aiHistoryList.map(history => (
+                    <div 
+                      key={history.id} 
+                      onClick={() => {
+                        setSelectedText(history.selectedText, history.page);
+                        setTranslationResult(history.result);
+                        setIsViewingHistory(false);
+                      }}
+                      className="flex flex-col gap-2 p-3 bg-surface border border-outline-variant rounded-lg hover:border-primary/50 hover:bg-primary/5 cursor-pointer transition-all shadow-sm"
+                    >
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-[10px] font-bold bg-surface-variant text-on-surface-variant px-1.5 py-0.5 rounded">
+                          {history.type === 'translate' ? '번역' : '요약'}
+                        </span>
+                        <span className="text-[10px] text-on-surface-variant/70">
+                          {new Date(history.createdAt).toLocaleString(undefined, {
+                            month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                      <p className="text-xs text-on-surface line-clamp-2 leading-relaxed">{history.selectedText}</p>
+                      <div className="h-px w-full bg-outline-variant/50 my-1" />
+                      <p className="text-xs text-on-surface-variant line-clamp-2 leading-relaxed">{history.result}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              {/* Source Quote */}
+              <div className="flex flex-col gap-2">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => setIsViewingHistory(true)}
+                      className="p-1 flex items-center justify-center hover:bg-surface-variant rounded-full text-on-surface-variant hover:text-primary transition-colors -ml-1"
+                      title="AI 내역 조회"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">history</span>
+                    </button>
+                    <span className="text-ui-label-sm text-on-surface-variant uppercase tracking-wider">선택된 문장</span>
+                    {selectedText && (
                     <div className="flex gap-1 ml-1">
                       <button 
                         onClick={() => handleTranslate("translate")}
@@ -292,7 +372,8 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
                 />
               </div>
             </div>
-          </>
+            </>
+          )
         )}
         
         {activeTab === "memo" && (
