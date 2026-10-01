@@ -21,6 +21,17 @@ export function useMetadataSync(fileId: string | null) {
       return activeData;
     },
     [fileId],
+  );
+
+  const trashList = useLiveQuery(
+    async () => {
+      if (!fileId) return [];
+      const localData = await db.pdfMetadata.where("fileId").equals(fileId).toArray();
+      const deletedData = localData.filter(item => !!item.deletedAt);
+      deletedData.sort((a, b) => new Date(b.deletedAt!).getTime() - new Date(a.deletedAt!).getTime());
+      return deletedData;
+    },
+    [fileId],
     []
   );
 
@@ -290,5 +301,34 @@ export function useMetadataSync(fileId: string | null) {
     }
   };
 
-  return { metadataList: metadataList || [], saveMetadata, updateMetadata, deleteMetadata, manualSync, isSyncing };
+  // 6. 메타데이터 복구 (Restore)
+  const restoreMetadata = async (id: string) => {
+    const isLocalFile = fileId?.startsWith('local-');
+    const now = new Date().toISOString();
+
+    const item = await db.pdfMetadata.get(id);
+    if (item) {
+      delete item.deletedAt;
+      item.updatedAt = now;
+      item.isUnsynced = isLocalFile ? false : !userId;
+      await db.pdfMetadata.put(item);
+    }
+
+    if (userId && !isLocalFile) {
+      try {
+        const { error } = await supabase.from("pdf_metadata")
+          .update({ deleted_at: null, updated_at: now })
+          .eq("id", id).eq("user_id", userId);
+          
+        if (!error && item) {
+          item.isUnsynced = false;
+          await db.pdfMetadata.put(item);
+        }
+      } catch (err) {
+        console.error("Supabase 복구 동기화 실패:", err);
+      }
+    }
+  };
+
+  return { metadataList: metadataList || [], trashList: trashList || [], saveMetadata, updateMetadata, deleteMetadata, restoreMetadata, manualSync, isSyncing };
 }

@@ -31,7 +31,8 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
   const [isTranslating, setIsTranslating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { metadataList, saveMetadata, updateMetadata, deleteMetadata, manualSync, isSyncing } = useMetadataSync(selectedFileId);
+  const { metadataList, trashList, saveMetadata, updateMetadata, deleteMetadata, restoreMetadata, manualSync, isSyncing } = useMetadataSync(selectedFileId);
+  const [isViewingTrash, setIsViewingTrash] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
@@ -423,7 +424,14 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
             ) : (
               <div className="flex gap-2">
                 <button 
-                  onClick={() => setIsAddingMemo(true)}
+                  onClick={() => setIsViewingTrash(!isViewingTrash)}
+                  className={`p-2 border border-outline-variant rounded-lg transition-colors flex items-center justify-center ${isViewingTrash ? 'bg-error/10 text-error border-error/50' : 'text-on-surface-variant hover:bg-surface-variant'}`}
+                  title="휴지통"
+                >
+                  <span className="material-symbols-outlined text-[16px]">delete</span>
+                </button>
+                <button 
+                  onClick={() => { setIsAddingMemo(true); setIsViewingTrash(false); }}
                   className="flex-1 py-2 border border-dashed border-outline-variant rounded-lg text-on-surface-variant hover:bg-surface-variant hover:text-primary transition-colors flex items-center justify-center gap-1.5 text-xs font-bold"
                 >
                   <span className="material-symbols-outlined text-[16px]">add</span>
@@ -440,12 +448,12 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
               </div>
             )}
 
-            {metadataList.length === 0 ? (
+            {(isViewingTrash ? trashList : metadataList).length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 text-on-surface-variant">
-                <p>저장된 메모나 책갈피가 없습니다.</p>
+                <p>{isViewingTrash ? "휴지통이 비어있습니다." : "저장된 메모나 책갈피가 없습니다."}</p>
               </div>
             ) : (
-              [...metadataList].sort((a, b) => {
+              [...(isViewingTrash ? trashList : metadataList)].sort((a, b) => {
                 if (sortOrder === "page") {
                   if (a.page === b.page) return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
                   return a.page - b.page;
@@ -477,20 +485,32 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
                       )}
                     </div>
                     <div className="flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                      {editingId !== meta.id && (
+                      {isViewingTrash ? (
                         <button 
-                          onClick={(e) => { e.stopPropagation(); handleStartEdit(meta.id, meta.content); }}
-                          className="text-on-surface-variant hover:text-primary p-1 flex items-center justify-center"
+                          onClick={(e) => { e.stopPropagation(); restoreMetadata(meta.id); }}
+                          className="text-on-surface-variant hover:text-[#00a572] p-1 flex items-center justify-center"
+                          title="복구하기"
                         >
-                          <span className="material-symbols-outlined text-[16px]">edit</span>
+                          <span className="material-symbols-outlined text-[16px]">restore_from_trash</span>
                         </button>
+                      ) : (
+                        <>
+                          {editingId !== meta.id && (
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); handleStartEdit(meta.id, meta.content); }}
+                              className="text-on-surface-variant hover:text-primary p-1 flex items-center justify-center"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">edit</span>
+                            </button>
+                          )}
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); deleteMetadata(meta.id); }}
+                            className="text-on-surface-variant hover:text-error p-1 flex items-center justify-center"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">delete</span>
+                          </button>
+                        </>
                       )}
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); deleteMetadata(meta.id); }}
-                        className="text-on-surface-variant hover:text-error p-1 flex items-center justify-center"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">delete</span>
-                      </button>
                     </div>
                   </div>
                   
