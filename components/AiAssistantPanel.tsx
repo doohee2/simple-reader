@@ -426,9 +426,9 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
                 <button 
                   onClick={() => setIsViewingTrash(!isViewingTrash)}
                   className={`p-2 border border-outline-variant rounded-lg transition-colors flex items-center justify-center ${isViewingTrash ? 'bg-error/10 text-error border-error/50' : 'text-on-surface-variant hover:bg-surface-variant'}`}
-                  title="휴지통"
+                  title={isViewingTrash ? "이전 목록으로 돌아가기" : "휴지통"}
                 >
-                  <span className="material-symbols-outlined text-[16px]">delete</span>
+                  <span className="material-symbols-outlined text-[16px]">{isViewingTrash ? 'arrow_back' : 'delete'}</span>
                 </button>
                 <button 
                   onClick={() => { setIsAddingMemo(true); setIsViewingTrash(false); }}
