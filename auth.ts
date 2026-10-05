@@ -22,7 +22,10 @@ async function refreshAccessToken(token: any) {
     const refreshedTokens = await response.json();
 
     if (!response.ok) {
-      throw refreshedTokens;
+      if (refreshedTokens?.error === "invalid_grant" || response.status === 400 || response.status === 401) {
+        throw new Error("invalid_grant");
+      }
+      throw new Error("transient_error");
     }
 
     return {
@@ -31,12 +34,19 @@ async function refreshAccessToken(token: any) {
       accessTokenExpires: Date.now() + refreshedTokens.expires_in * 1000,
       refreshToken: refreshedTokens.refresh_token ?? token.refreshToken, // Fall back to old refresh token
     };
-  } catch (error) {
-    console.error("RefreshAccessTokenError", error);
-    return {
-      ...token,
-      error: "RefreshAccessTokenError",
-    };
+  } catch (error: any) {
+    console.error("RefreshAccessTokenError:", error);
+    
+    // 치명적 실패(권한 철회, 만료 등)일 경우에만 로그아웃 트리거
+    if (error?.message === "invalid_grant") {
+      return {
+        ...token,
+        error: "RefreshAccessTokenError",
+      };
+    }
+    
+    // 일시적 네트워크 오류 등은 기존 토큰을 반환하여 다음 요청에 재시도
+    return token;
   }
 }
 
@@ -55,6 +65,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
+  session: {
+    maxAge: 180 * 24 * 60 * 60, // 180일 세션 유지
+  },
   callbacks: {
     async jwt({ token, account }) {
       // Initial sign in
@@ -65,12 +78,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         return token;
       }
 
-      // Return previous token if the access token has not expired yet
-      if (Date.now() < (token.accessTokenExpires as number)) {
+      // Return previous token if the access token has not expired yet (60초 전 사전 갱신)
+      if (Date.now() < (token.accessTokenExpires as number) - 60 * 1000) {
         return token;
       }
 
-      // Access token has expired, try to update it
+      // Access token has expired (or is about to), try to update it
       return await refreshAccessToken(token);
     },
     async session({ session, token }) {

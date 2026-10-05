@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import db from '@/lib/db';
 import { useStore } from '@/store/useStore';
 import { useSession } from 'next-auth/react';
+import { fetchWithSessionRetry } from '@/lib/fetchWithSessionRetry';
 
 export type DownloadState = 'idle' | 'confirm' | 'downloading' | 'proxy_confirm' | 'error' | 'success';
 
@@ -141,12 +142,17 @@ export function usePdfFile(fileId: string | null) {
     abortControllerRef.current = new AbortController();
 
     try {
-      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+      const res = await fetchWithSessionRetry(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
         headers: {
           Authorization: `Bearer ${session.accessToken}`,
         },
         signal: abortControllerRef.current.signal,
-      });
+      }, (newSession) => ({
+        headers: {
+          Authorization: `Bearer ${newSession.accessToken}`,
+        },
+        signal: abortControllerRef.current.signal,
+      }));
 
       if (!res.ok) {
         throw new Error(`Direct download failed with status ${res.status}`);
@@ -177,7 +183,7 @@ export function usePdfFile(fileId: string | null) {
     abortControllerRef.current = new AbortController();
 
     try {
-      const res = await fetch(`/api/drive/download?fileId=${fileId}`, {
+      const res = await fetchWithSessionRetry(`/api/drive/download?fileId=${fileId}`, {
         signal: abortControllerRef.current.signal,
       });
 

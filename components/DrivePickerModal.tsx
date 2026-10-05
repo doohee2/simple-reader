@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X, FileText, Loader2, Folder, Pin } from "lucide-react";
+import { fetchWithSessionRetry } from "@/lib/fetchWithSessionRetry";
 
 interface DriveFile {
   id: string;
@@ -66,7 +67,7 @@ export default function DrivePickerModal({ isOpen, onClose, onSelectFile }: Driv
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/drive/list?folderId=${currentFolderId}`);
+        const res = await fetchWithSessionRetry(`/api/drive/list?folderId=${currentFolderId}`);
         if (!res.ok) {
           throw new Error("파일 목록을 불러오는 데 실패했습니다.");
         }

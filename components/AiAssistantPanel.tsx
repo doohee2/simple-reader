@@ -6,6 +6,7 @@ import { useStore } from "@/store/useStore";
 import { useMetadataSync } from "@/hooks/useMetadataSync";
 import { useLiveQuery } from "dexie-react-hooks";
 import db from "@/lib/db";
+import { fetchWithSessionRetry } from "@/lib/fetchWithSessionRetry";
 
 interface AiAssistantPanelProps {
   forceTab?: "ai" | "memo";
@@ -65,7 +66,7 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
     setError(null);
 
     try {
-      const res = await fetch("/api/translate", {
+      const res = await fetchWithSessionRetry("/api/translate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
