@@ -146,12 +146,12 @@ export function usePdfFile(fileId: string | null) {
         headers: {
           Authorization: `Bearer ${session.accessToken}`,
         },
-        signal: abortControllerRef.current.signal,
+        signal: abortControllerRef.current?.signal,
       }, (newSession) => ({
         headers: {
           Authorization: `Bearer ${newSession.accessToken}`,
         },
-        signal: abortControllerRef.current.signal,
+        signal: abortControllerRef.current?.signal,
       }));
 
       if (!res.ok) {
@@ -184,7 +184,7 @@ export function usePdfFile(fileId: string | null) {
 
     try {
       const res = await fetchWithSessionRetry(`/api/drive/download?fileId=${fileId}`, {
-        signal: abortControllerRef.current.signal,
+        signal: abortControllerRef.current?.signal,
       });
 
       if (!res.ok) {
