@@ -9,8 +9,7 @@ const DriveListQuerySchema = z.object({
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
-    // @ts-expect-error - NextAuth 타입이 정확히 매칭되지 않는 문제 우회
-    const accessToken = session?.accessToken;
+    const accessToken = session?.accessToken as string | undefined;
 
     if (!session || !accessToken) {
       return NextResponse.json({ error: "요청을 처리할 수 없습니다." }, { status: 401 });

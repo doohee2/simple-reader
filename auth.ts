@@ -88,10 +88,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return await refreshAccessToken(token);
     },
     async session({ session, token }) {
-      // @ts-expect-error - NextAuth 타입이 정확히 매칭되지 않는 문제 우회
-      session.accessToken = token.accessToken;
-      // @ts-expect-error - NextAuth 타입이 정확히 매칭되지 않는 문제 우회
-      session.error = token.error;
+      session.accessToken = token.accessToken as string | undefined;
+      session.error = token.error as string | undefined;
       if (session.user && token.sub) {
         session.user.id = token.sub;
       }

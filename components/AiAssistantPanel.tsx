@@ -43,7 +43,8 @@ export default function AiAssistantPanel({ forceTab }: AiAssistantPanelProps = {
 
   const [isViewingHistory, setIsViewingHistory] = useState(false);
   const aiHistoryList = useLiveQuery(
-    () => selectedFileId ? db.aiHistory.where("fileId").equals(selectedFileId).reverse().sortBy("createdAt") : Promise.resolve([] as unknown[]),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    () => selectedFileId ? db.aiHistory.where("fileId").equals(selectedFileId).reverse().sortBy("createdAt") : Promise.resolve([] as any[]),
     [selectedFileId]
   ) || [];
 
