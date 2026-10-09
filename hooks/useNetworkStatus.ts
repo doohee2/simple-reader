@@ -36,7 +36,7 @@ export function useNetworkStatus() {
       const online = response.ok;
       setIsOnline(online);
       return online;
-    } catch (e) {
+    } catch {
       // 타임아웃 또는 회선 단절 발생 시 진짜 오프라인으로 판독
       setIsOnline(false);
       return false;
@@ -45,7 +45,7 @@ export function useNetworkStatus() {
 
   useEffect(() => {
     // 마운트 직후 실제 통신 가능 여부 검증
-    checkNetworkStatus();
+    setTimeout(() => { void checkNetworkStatus(); }, 0);
 
     const handleOnline = () => {
       checkNetworkStatus();

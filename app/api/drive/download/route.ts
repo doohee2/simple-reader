@@ -12,7 +12,7 @@ export async function GET(
   try {
     const session = await auth();
     
-    // @ts-ignore
+    // @ts-expect-error - NextAuth 타입이 정확히 매칭되지 않는 문제 우회
     const accessToken = session?.accessToken;
 
     if (!session || !accessToken) {

@@ -1,7 +1,8 @@
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import { JWT } from "next-auth/jwt";
 
-async function refreshAccessToken(token: any) {
+async function refreshAccessToken(token: JWT) {
   try {
     const url =
       "https://oauth2.googleapis.com/token?" +
@@ -34,11 +35,11 @@ async function refreshAccessToken(token: any) {
       accessTokenExpires: Date.now() + refreshedTokens.expires_in * 1000,
       refreshToken: refreshedTokens.refresh_token ?? token.refreshToken, // Fall back to old refresh token
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("RefreshAccessTokenError:", error);
     
     // 치명적 실패(권한 철회, 만료 등)일 경우에만 로그아웃 트리거
-    if (error?.message === "invalid_grant") {
+    if (error instanceof Error && error.message === "invalid_grant") {
       return {
         ...token,
         error: "RefreshAccessTokenError",
@@ -87,9 +88,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return await refreshAccessToken(token);
     },
     async session({ session, token }) {
-      // @ts-ignore
+      // @ts-expect-error - NextAuth 타입이 정확히 매칭되지 않는 문제 우회
       session.accessToken = token.accessToken;
-      // @ts-ignore
+      // @ts-expect-error - NextAuth 타입이 정확히 매칭되지 않는 문제 우회
       session.error = token.error;
       if (session.user && token.sub) {
         session.user.id = token.sub;
