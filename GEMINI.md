@@ -21,8 +21,7 @@
 - **인증 (Authentication)**: NextAuth.js v5 Beta (Google OAuth - `drive.readonly` 스코프 적용)
 - **AI 연동**: `@google/genai` (Gemini 2.0 Flash 모델 활용, 실시간 Streaming Text 전송)
 - **DB 및 스토리지 (Hybrid Sync Engine)**:
-  - **Local**: `Dexie.js` 및 `dexie-react-hooks` (`useLiveQuery`를 활용하여 수십 MB의 PDF ArrayBuffer를 0.1초 만에 캐싱하고, 메타데이터 변경을 UI에 실시간 반영)
-  - **Cloud**: `Supabase JS Client` (PostgreSQL 기반으로 로컬에서 작성한 메모와 책갈피를 클라우드에 백그라운드 동기화)
+  - **Cloud**: `Supabase JS Client` (PostgreSQL 기반으로 로컬에서 작성한 메모와 책갈피를 클라우드에 백그라운드 동기화. 보안 강화를 위해 브라우저에서 직접 통신하지 않고 Vercel 서버의 API 라우트 `/api/metadata/sync` 를 경유하여 안전하게 통신합니다.)
 
 ---
 
@@ -92,7 +91,7 @@ simple-reader/
 4. **메타데이터 하이브리드 동기화 테스트**:
    - 번역된 내용을 `메모로 저장`하고, PDF 상단 툴바의 `책갈피 아이콘`을 눌러 저장합니다.
    - 브라우저의 개발자 도구(F12) -> `Application` 탭 -> `IndexedDB`에서 `SimpleReaderDB`에 데이터가 들어왔는지 확인합니다.
-   - Supabase 대시보드의 `pdf_metadata` 테이블에도 동일한 데이터가 백그라운드로 업로드(Upsert) 되었는지 검증합니다. (새로고침을 해도 메모가 유지되어야 합니다)
+   - 백그라운드에서 `/api/metadata/sync` API를 거쳐 Supabase 대시보드의 `pdf_metadata` 테이블에도 동일한 데이터가 업로드(Upsert) 되었는지 검증합니다. (새로고침을 해도 메모가 유지되어야 합니다)
 5. **구글 드라이브 전용 서재 지정 및 중첩 탐색 테스트**:
    - 드라이브 모달을 열고 특정 폴더로 진입한 후 상단 경로(브레드크럼) 옆의 `[📌]` 핀 버튼을 클릭하여 서재로 지정합니다.
    - 모달을 다시 열었을 때 해당 폴더 안의 PDF 항목들만 보여주는 '내 서재' 모드로 바로 진입하는지 확인합니다.
@@ -258,8 +257,8 @@ simple-reader/
    - **에러 메시지 위생화(Error Sanitization):** 외부 통신 실패나 내부 예외 시 상세 스택 트레이스 및 오류 원문은 오직 터미널·서버 로그(`console.error`)에만 기록하고, 브라우저로 반환되는 응답문은 **`"요청을 처리할 수 없습니다."`**로 규격을 100% 통일하여 내부 정보 누출을 봉쇄했습니다.
 
 2. **환경변수 격리(Zero-Leak) 및 비밀자격 관리**
-   - **백엔드 시크릿 노출 방지:** `GEMINI_API_KEY`, `GOOGLE_CLIENT_SECRET`, `NEXTAUTH_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` 등 기밀 서비스 시크릿에 `NEXT_PUBLIC_` 접두사가 유출되지 않는지 정기 검증(Zero-Leak)합니다. 
-   - **배포 대시보드 주의 안내:** Vercel 등 호스팅 대시보드 설정 시에도 기밀 자격정보는 무의미하게 클라이언트 번들에 혼합되지 않도록 반드시 순수 백엔드 변수로만 지정해야 합니다. (단, Supabase Anon Key는 PostgreSQL RLS 정책 아래 브라우저 측 Dexie 하이브리드 싱크 구동용이므로 `NEXT_PUBLIC_`를 적법하게 유지합니다).
+   - **백엔드 시크릿 노출 방지:** `GEMINI_API_KEY`, `GOOGLE_CLIENT_SECRET`, `NEXTAUTH_SECRET`, `SUPABASE_URL`, `SUPABASE_ANON_KEY` 등 기밀 서비스 시크릿에 `NEXT_PUBLIC_` 접두사가 유출되지 않는지 정기 검증(Zero-Leak)합니다. 
+   - **서버 API 프록시 동기화(Server-Proxy Sync):** 다중 앱이 하나의 Supabase를 공유하는 구조적 특성을 고려하여, 브라우저가 직접 DB 통신을 하던 기존 방식을 폐기하고 **Next.js 백엔드(`/api/metadata/sync`)를 경유하는 프록시 아키텍처**로 전면 개편했습니다. 브라우저는 `NEXT_PUBLIC_` 키 없이 오직 자체 API 서버와만 통신하며, 서버가 `auth()` 세션 기반으로 유저 신원을 강제 검증한 뒤에만 안전하게 Supabase 데이터를 읽고 씁니다.
 
 3. **PWA 오프라인 캐시 및 인증 토큰 로컬 보안 (Cache Purging)**
    - **인증 토큰 격리:** Access Token 및 JWT 세션은 `localStorage`나 `IndexedDB`에 평문으로 절대 저장하지 않고 오직 NextAuth가 제어하는 **HttpOnly 암호화 쿠키**로 보호합니다.

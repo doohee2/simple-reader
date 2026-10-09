@@ -6,7 +6,7 @@ import { getStorageStats, deletePdfCache, clearAllPdfCaches, StorageStat } from 
 import db from "@/lib/db";
 import { useStore } from "@/store/useStore";
 import { useSession } from "next-auth/react";
-import { supabase } from "@/lib/supabase";
+import { fetchWithSessionRetry } from "@/lib/fetchWithSessionRetry";
 
 interface StorageManagerModalProps {
   isOpen: boolean;
@@ -45,7 +45,7 @@ export default function StorageManagerModal({ isOpen, onClose }: StorageManagerM
       await deletePdfCache(fileId);
       await db.pdfMetadata.where({ fileId }).delete();
       if (session?.user?.id) {
-        await supabase.from("pdf_metadata").delete().eq("file_id", fileId).eq("user_id", session.user.id);
+        await fetchWithSessionRetry(`/api/metadata/sync?fileId=${fileId}`, { method: "DELETE" });
       }
       await loadStats();
     }
@@ -56,7 +56,7 @@ export default function StorageManagerModal({ isOpen, onClose }: StorageManagerM
       await clearAllPdfCaches();
       await db.pdfMetadata.clear();
       if (session?.user?.id) {
-        await supabase.from("pdf_metadata").delete().eq("user_id", session.user.id);
+        await fetchWithSessionRetry(`/api/metadata/sync`, { method: "DELETE" });
       }
       await loadStats();
     }
