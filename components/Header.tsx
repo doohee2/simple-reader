@@ -82,22 +82,22 @@ export default function Header() {
       <header className="flex justify-between items-center w-full px-2 md:px-8 h-14 md:h-16 bg-surface border-b border-outline-variant flex-shrink-0 z-10 gap-2">
         {/* 좌측: 로고 및 파일명 */}
         <div className="flex items-center gap-1 md:gap-4 flex-1 min-w-0">
-          <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
-            <button 
-              onClick={() => setIsInfoModalOpen(true)}
-              className={`material-symbols-outlined text-primary text-xl md:text-2xl font-bold hover:opacity-80 transition-opacity ${selectedFileName ? 'hidden sm:block' : 'block'}`}
-              title="앱 정보"
-            >
+          <button 
+            onClick={() => setIsInfoModalOpen(true)}
+            className={`flex items-center gap-2 md:gap-3 flex-shrink-0 text-left hover:opacity-80 transition-opacity cursor-pointer ${selectedFileName ? 'hidden sm:flex' : 'flex'}`}
+            title="앱 정보"
+          >
+            <span className="material-symbols-outlined text-primary text-xl md:text-2xl font-bold">
               menu_book
-            </button>
+            </span>
             <div className="flex items-center">
-              <svg viewBox="0 0 340 60" className={`h-[28px] sm:h-[34px] w-auto drop-shadow-sm ${selectedFileName ? 'hidden sm:block' : 'block'}`} fill="none" xmlns="http://www.w3.org/2000/svg" style={{ fontFamily: 'var(--font-plus-jakarta-sans), sans-serif' }}>
+              <svg viewBox="0 0 340 60" className="h-[28px] sm:h-[34px] w-auto drop-shadow-sm" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ fontFamily: 'var(--font-plus-jakarta-sans), sans-serif' }}>
                 <text x="0" y="45" fontWeight="800" fontSize="42" letterSpacing="-0.02em" className="fill-[#0044cc] dark:fill-[#d0ebff] transition-colors duration-300">Simple</text>
                 <circle cx="18" cy="10" r="4" className="fill-[#0044cc] dark:fill-[#d0ebff] transition-colors duration-300"/>
                 <text x="150" y="45" fontWeight="700" fontSize="42" letterSpacing="-0.02em" className="fill-current text-on-surface transition-colors duration-300">Reader</text>
               </svg>
             </div>
-          </div>
+          </button>
           {selectedFileName && (
             <>
               <div className="h-4 md:h-6 w-px bg-outline-variant mx-1 md:mx-2 hidden sm:block"></div>
