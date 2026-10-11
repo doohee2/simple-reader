@@ -231,7 +231,9 @@ export default function Header() {
               <X size={20} />
             </button>
             <div className="flex items-center justify-center mb-6 mt-2 gap-2 text-primary">
-              <span className="material-symbols-outlined text-[28px]">info</span>
+              <span className="material-symbols-outlined text-[32px] text-[#0044cc] dark:text-[#d0ebff] transition-colors duration-300">
+                menu_book
+              </span>
               <svg viewBox="0 0 340 60" className="h-[36px] w-auto drop-shadow-sm" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ fontFamily: 'var(--font-plus-jakarta-sans), sans-serif' }}>
                 <text x="0" y="45" fontWeight="800" fontSize="42" letterSpacing="-0.02em" className="fill-[#0044cc] dark:fill-[#d0ebff] transition-colors duration-300">Simple</text>
                 <circle cx="18" cy="10" r="4" className="fill-[#0044cc] dark:fill-[#d0ebff] transition-colors duration-300"/>
@@ -271,9 +273,17 @@ export default function Header() {
                 </span>
                 {isUpdating ? '업데이트 중...' : '최신 버전으로 업데이트'}
               </button>
-              <p className="text-ui-label-sm text-on-surface-variant font-medium text-right">
-                {APP_INFO.VERSION}
-              </p>
+              <div className="flex items-center justify-between text-ui-label-sm text-on-surface-variant font-medium pt-1">
+                <a
+                  href="https://landing-doohee2.vercel.app/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-primary underline transition-colors"
+                >
+                  개인정보처리방침
+                </a>
+                <span>{APP_INFO.VERSION}</span>
+              </div>
             </div>
           </div>
         </div>
