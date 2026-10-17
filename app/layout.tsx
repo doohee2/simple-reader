@@ -33,6 +33,9 @@ export const metadata: Metadata = {
     icon: "/icons/icon-192x192.png",
     apple: "/icons/icon-192x192.png",
   },
+  verification: {
+    google: "WdxZQ1sGoma51XTaHhrfapOp64txalt2SBACCB7GOCY",
+  },
 };
 
 import Providers from "@/components/Providers";
