@@ -1,274 +1,332 @@
-# Simple Reader (스마트 이북 리더기) 개발 문서
+# Simple Reader (스마트 이북 리더기) 통합 개발 문서
 
 ## 1. 프로젝트 개요 (Project Overview)
-**Simple Reader**는 구글 드라이브에 보관된 PDF 파일을 빠르게 로드하여 읽고, 모르는 문장을 드래그하여 즉시 제미나이(Gemini) AI로 번역 및 요약할 수 있는 **PWA 기반 스마트 독서 웹앱**입니다. 사용자는 AI의 답변을 로컬 환경과 클라우드(Supabase)에 동시에 동기화되는 하이브리드 메모장 및 책갈피 기능과 함께 관리할 수 있습니다. 
-사내 방화벽 등의 제약 사항을 우회하기 위해 구글의 기본 Picker Iframe을 사용하지 않고 자체적인 Google Drive API 탐색 모달을 구축하여 보안성과 사용성을 동시에 잡았습니다. 또한 사용자가 직접 '서재' 폴더를 지정하거나, 로컬 기기의 저장소 용량(PDF 캐시)을 유연하게 관리할 수 있는 고도화된 기능들을 제공합니다.
+
+**Simple Reader**는 구글 드라이브(Google Drive) 및 로컬 저장소에 보관된 대용량 PDF 문서를 0.1초 만에 불러와 쾌적하게 열람하고, 모르는 외국어 문장을 드래그하여 즉시 구글 제미나이(Gemini 2.0 Flash) AI로 실시간 번역 및 요약할 수 있는 **PWA 기반 스마트 이북 리더 웹 애플리케이션**입니다.
+
+사내 보안망이나 방화벽 환경에서 구글 공식 Picker Iframe이 차단되는 한계를 극복하기 위해 자체적인 Google Drive REST API 탐색기를 구현하였으며, 대용량 PDF 바이너리 데이터를 브라우저 로컬 저장소(IndexedDB / Dexie.js)에 우선 캐싱하는 **오프라인 퍼스트(Offline-First)** 설계를 채택했습니다. 사용자가 작성한 독서 메모와 책갈피는 Vercel 서버의 API 프록시(`/api/metadata/sync`)를 통해 안전하게 클라우드(Supabase PostgreSQL)에 자동 양방향 동기화되며, 다중 기기(PC, 태블릿, 모바일) 간에 동일한 독서 환경을 제공합니다.
 
 ---
 
-## 2. 기술 스택 및 프레임워크 (Tech Stack)
+## 2. 시스템 아키텍처 및 데이터 흐름 (System Architecture)
+
+```mermaid
+flowchart TD
+    subgraph Client ["Client Browser (PWA / Mobile / Desktop)"]
+        UI["React UI (Next.js App Router)"]
+        PDF["PDF Viewer (react-pdf + Custom Zoom Engine)"]
+        Dexie[("Local IndexedDB (Dexie.js)\n- pdfCache\n- pdfMetadata\n- aiHistory")]
+        SW["Serwist Service Worker (Runtime Caching & Offline Fallback)"]
+    end
+
+    subgraph Server ["Next.js Backend (Vercel Serverless)"]
+        AuthRoute["/api/auth/[...nextauth]\n(NextAuth v5 Google OAuth)"]
+        DriveList["/api/drive/list\n(Drive REST API)"]
+        DriveDownload["/api/drive/download\n(Fallback Binary Proxy)"]
+        TranslateRoute["/api/translate\n(Gemini AI Streaming)"]
+        SyncRoute["/api/metadata/sync\n(Server-Proxy Sync Engine)"]
+    end
+
+    subgraph External ["External Cloud Services"]
+        GoogleDrive[("Google Drive API")]
+        GeminiAI["Google Gemini AI\n(Flash-Lite / Flash / Pro)"]
+        SupabaseDB[("Supabase PostgreSQL\n(pdf_metadata)")]
+    end
+
+    %% Data Flows
+    UI <--> Dexie
+    PDF <--> Dexie
+    UI --> SW
+    UI <-->|"fetchWithSessionRetry (401 Auto Retry)"| Server
+    UI <-->|"1순위: Direct Stream Download (Bearer Token)"| GoogleDrive
+
+    AuthRoute <-->|"OAuth2 Token Exchange"| GoogleDrive
+    DriveList <-->|"drive.readonly Scope"| GoogleDrive
+    DriveDownload <-->|"2순위: CORS/Error Fallback Proxy"| GoogleDrive
+    TranslateRoute <-->|"Streaming Text"| GeminiAI
+    SyncRoute <-->|"Zero-Leak Proxy Access"| SupabaseDB
+```
+
+### **핵심 데이터 흐름 요약**
+1. **PDF 2단계 하이브리드 다운로드(Direct-First, Proxy-Fallback) 및 로컬 캐싱**:
+   - `DrivePickerModal`에서 파일을 선택하면, Vercel 서버 대역폭 절약과 속도 극대화를 위해 **1순위로 브라우저가 Google Drive API에서 직접(Direct) 스트리밍 다운로드**를 수행하며 실시간 진행률(`DownloadProgressModal`)을 표시합니다.
+   - 만약 CORS 정책이나 사내 보안망 제약으로 직접 다운로드가 실패할 경우, 사용자 확인(`proxy_confirm`)을 거쳐 **2순위인 백엔드 프록시(`/api/drive/download`)**로 안전하게 우회 다운로드합니다.
+   - 받아온 `ArrayBuffer`는 브라우저의 `Dexie.js`(`pdfCache`)에 즉시 영구 저장되어, 재방문 시 네트워크 요청 없이 **0.1초 만에 로컬에서 즉각 렌더링**됩니다.
+2. **AI 실시간 번역·요약 및 히스토리**:
+   - 사용자가 PDF 문장을 드래그(또는 직접 입력)하면 플로팅 툴팁이 팝업되며, 번역/요약 요청 시 `/api/translate` 엔드포인트를 통해 선택한 Gemini 모델(`flash-lite`, `flash`, `pro`) 및 커스텀 프롬프트와 함께 실시간 스트리밍 통신(`ReadableStream`)을 수행합니다.
+   - 질의 내역은 로컬 DB(`aiHistory`)에 자동 보관(파일당 최대 50개 롤링)되어 이전 질의 결과를 언제든 원문과 함께 즉각 복원할 수 있습니다.
+3. **하이브리드 서버 프록시 메타데이터 동기화 (Hybrid Server-Proxy Sync)**:
+   - 메모 및 책갈피는 생성 즉시 로컬 DB(`pdfMetadata`)에 반영(UI 딜레이 제로)된 뒤, 백그라운드에서 `/api/metadata/sync` 라우트로 일괄 전송(Upsert)됩니다.
+   - 브라우저에 Supabase 접속 키가 노출되지 않으며, 서버가 NextAuth 세션을 기반으로 사용자 신원을 검증하고 권한을 강제 부여한 뒤 Supabase DB에 안전하게 보관합니다.
+
+---
+
+## 3. 기술 스택 및 개발 프레임워크 (Tech Stack)
 
 ### **프론트엔드 (Frontend)**
-- **Framework**: Next.js (App Router), React
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS (CSS Variables 기반 자체 디자인 시스템)
-- **State Management**: Zustand (전역 상태 관리)
-- **UI Components**: `lucide-react` (아이콘), `react-resizable-panels` (화면 분할 패널), `react-zoom-pan-pinch` (PDF 줌/팬 상호작용)
-- **PDF 렌더러**: `react-pdf` (서버사이드 렌더링 충돌 방지를 위해 `next/dynamic`로 동적 로딩 적용. *Next.js 웹팩 컴파일러와의 충돌 방지를 위해 v9.1.0 및 pdfjs-dist v3.11.174 안정화 버전 사용*)
-- **PWA**: `@serwist/next` (서비스 워커, 오프라인 캐싱, manifest 생성)
+- **Framework**: Next.js 16.2 (App Router), React 19
+- **Language**: TypeScript 5 (엄격한 타입 체크 및 무결성 보장)
+- **Styling**: Tailwind CSS v4 (CSS 변수 기반 다크/라이트 테마 디자인 토큰 시스템)
+- **State Management**: Zustand (`persist` 미들웨어를 통해 마지막 열람 파일, 보기 모드, 테마 상태를 `localStorage`에 영속화)
+- **Data Fetching & Offline Control**: `@tanstack/react-query` (오프라인 시 불필요한 재시도 즉시 차단 및 온라인 복구 시 자동 리페치)
+- **Icons & Typography**: `lucide-react`, Google Material Symbols Outlined, Inter, Merriweather
+- **UI Panels & Layout**: `react-resizable-panels` (데스크탑 좌우 너비 조절), 자체 개발 `MobileBottomSheet` (모바일 상하 제어)
+- **PDF Rendering & Interaction**:
+  - `react-pdf` (v9.1.0) & `pdfjs-dist` (v3.11.174) — SSR 충돌 방지 및 Next.js 웹팩 컴파일러 호환성 최적화
+  - `react-zoom-pan-pinch` — 모바일 터치 및 핀치 줌을 위한 베이스 라이브러리 (13대 자체 안정화 패치 탑재)
+- **Client Database**: `Dexie.js` & `dexie-react-hooks` (`useLiveQuery` 기반 리액티브 로컬 캐시 관리)
+- **PWA**: `@serwist/next` & `serwist` (고성능 서비스 워커, 오프라인 런타임 캐싱, 앱 매니페스트)
 
-### **백엔드 (Backend & API)**
-- **인증 (Authentication)**: NextAuth.js v5 Beta (Google OAuth - `drive.readonly` 스코프 적용)
-- **AI 연동**: `@google/genai` (Gemini 2.0 Flash 모델 활용, 실시간 Streaming Text 전송)
-- **DB 및 스토리지 (Hybrid Sync Engine)**:
-  - **Cloud**: `Supabase JS Client` (PostgreSQL 기반으로 로컬에서 작성한 메모와 책갈피를 클라우드에 백그라운드 동기화. 보안 강화를 위해 브라우저에서 직접 통신하지 않고 Vercel 서버의 API 라우트 `/api/metadata/sync` 를 경유하여 안전하게 통신합니다.)
+### **백엔드 및 서버리스 API (Backend & API)**
+- **Authentication**: NextAuth.js v5 Beta (Google OAuth 2.0, `drive.readonly` 스코프 적용)
+- **AI Integration**: `@google/genai` (Google Gemini `flash-lite` / `flash` / `pro` 모델 선택 지원, 실시간 Chunk Streaming 출력)
+- **Cloud Database**: `Supabase JS Client` (PostgreSQL 기반, `server-only` 패키지로 백엔드 API 라우트 내에서만 엄격히 구동)
+- **Validation**: `zod` (API 엔드포인트 요청 파라미터 및 본문 엄격 검증)
+- **Network Resilience**: 자체 구현 `fetchWithSessionRetry` (401 토큰 만료 감지 시 세션 자동 갱신 및 투명 재시도)
+
+### **테스트 및 빌드 도구 (Testing & Tooling)**
+- **Testing**: `Jest`, `@testing-library/react`, `@testing-library/user-event`, `msw`, `puppeteer`
+- **Image Processing**: `sharp` (앱 아이콘 리사이징 스크립트 등)
 
 ---
 
-## 3. 폴더 구조 및 주요 소스 파일 (Directory Structure)
+## 4. 폴더 구조 및 주요 소스 파일 명세 (Directory Structure)
 
 ```text
 simple-reader/
 ├── app/
-│   ├── layout.tsx         # 전역 레이아웃. PWA Manifest, Apple Web App 메타데이터, 폰트(Inter, Merriweather), NextAuth Provider 세팅
-│   ├── sw.ts              # Serwist 서비스 워커. 자산별 캐싱 전략(CacheFirst/StaleWhileRevalidate/NetworkFirst) 정의
-│   ├── page.tsx           # 메인 페이지 진입점. Header와 Workspace를 렌더링
-│   ├── globals.css        # Tailwind CSS 지시어 및 테마 색상(디자인 시스템) 토큰 정의
-│   └── api/               # 백엔드 API 라우트
-│       ├── auth/[...nextauth]/route.ts # NextAuth(Google 로그인) 엔드포인트
-│       ├── drive/list/route.ts         # 구글 드라이브 내 PDF 파일 목록을 조회 (자체 Picker 용도)
-│       ├── drive/download/route.ts     # 선택한 PDF 파일의 바이너리 데이터(ArrayBuffer)를 Fetch
-│       └── translate/route.ts          # 제미나이 AI 번역/요약 요청 및 Streaming ReadableStream 반환
+│   ├── layout.tsx                     # 전역 레이아웃. PWA Manifest, Apple Web App 메타데이터, 폰트, Provider 세팅
+│   ├── sw.ts                          # Serwist 서비스 워커. 5대 런타임 캐싱 전략 및 오프라인 핸들러 정의
+│   ├── page.tsx                       # 메인 진입점. Header 및 Workspace 렌더링
+│   ├── globals.css                    # Tailwind CSS v4 지시어 및 다크/라이트 테마 토큰 정의
+│   └── api/                           # 백엔드 API 라우트 (Node.js Serverless)
+│       ├── auth/[...nextauth]/route.ts# NextAuth v5 구글 로그인 및 토큰 갱신 엔드포인트
+│       ├── drive/list/route.ts        # 구글 드라이브 내 PDF 파일/폴더 목록 조회 (자체 브라우징)
+│       ├── drive/download/route.ts    # 구글 드라이브 파일 바이너리(ArrayBuffer) 우회 다운로드 프록시
+│       ├── metadata/sync/route.ts     # Supabase 메타데이터 동기화 프록시 (GET/POST/DELETE)
+│       └── translate/route.ts         # 제미나이 AI 번역/요약 스트리밍 엔드포인트 (모델/커스텀 프롬프트 지원)
 ├── components/
-│   ├── Providers.tsx      # NextAuth의 SessionProvider를 App Router 환경에 래핑
-│   ├── Header.tsx         # 상단 헤더. 파일명 표시, 오프라인 뱃지, 로그인/로그아웃 버튼, 앱 정보 모달(SW 캐시 업데이트 포함)
-│   ├── DrivePickerModal.tsx # 구글 드라이브 탐색 모달창 (특정 폴더를 '내 서재'로 지정 및 중첩 폴더 탐색 기능 포함)
-│   ├── StorageManagerModal.tsx # 로컬 저장소 관리자 UI (메타데이터는 보존하며 대용량 PDF 바이너리 캐시만 선택 삭제)
-│   ├── Workspace.tsx      # 메인 작업 영역. 데스크탑은 좌우 분할, 모바일은 상하 분할(BottomSheet) 레이아웃 적용
-│   ├── PdfViewer.tsx      # react-pdf 뷰어. 드래그 텍스트에 대한 플로팅 툴팁 버튼(번역/요약/메모) 제공 및 책갈피 연동
-│   ├── AiAssistantPanel.tsx # AI 패널. 번역/요약 스트리밍 출력, 메모 관리
-│   ├── MobileBottomSheet.tsx # 모바일 UI 전용 하단 드래그블 시트 (AI 패널 렌더링용)
-│   └── BottomNavBar.tsx   # 모바일 환경 전용 하단 네비게이션 도구 모음
+│   ├── Providers.tsx                  # NextAuth SessionProvider 및 React Query QueryClientProvider 래퍼
+│   ├── Header.tsx                     # 상단 헤더. 로고 버튼(앱 정보 모달), 파일명(도서 정보 모달), 오프라인 배지, 테마, 로그인
+│   ├── Workspace.tsx                  # 메인 작업 영역. 데스크탑(좌우 분할) / 모바일(상하 시트) 레이아웃
+│   ├── PdfViewer.tsx                  # 줌/스크롤 13대 엔진 적용 PDF 뷰어, 텍스트 드래그 플로팅 툴팁
+│   ├── AiAssistantPanel.tsx           # AI 번역/요약(모델 선택·프롬프트), 번역 히스토리, 메모·책갈피 관리 및 휴지통
+│   ├── DrivePickerModal.tsx           # 구글 드라이브 탐색기 모달 (폴더 서재 핀 고정 기능 포함)
+│   ├── StorageManagerModal.tsx        # 로컬 저장소 관리자 UI ('내 서재', 캐시/메타데이터 통계 확인 및 삭제)
+│   ├── BookInfoModal.tsx              # 현재 열린 PDF 도서 정보(파일명, 용량, 활성 메모/책갈피 개수) 확인 모달
+│   ├── DownloadProgressModal.tsx      # 구글 드라이브 파일 다운로드 진행률(%) 표시 및 프록시 우회 확인 모달
+│   ├── MobileBottomSheet.tsx          # 모바일 전용 하단 드래그블 시트 (AI 패널 및 메모 연동)
+│   └── BottomNavBar.tsx               # 모바일 환경 전용 하단 고정 네비게이션 툴바
 ├── hooks/
-│   ├── usePdfFile.ts      # Dexie.js 로컬 캐시를 1순위로 확인하고, 없으면 Google API로 다운로드하는 최적화 훅
-│   ├── useMetadataSync.ts # Dexie.js(로컬)와 Supabase(클라우드) 간의 메모/책갈피 하이브리드 동기화 로직 훅
-│   └── useNetworkStatus.ts # 브라우저 online/offline 이벤트 기반 네트워크 상태 감지 훅
+│   ├── usePdfFile.ts                  # Dexie 캐시 1순위 확인 및 Direct/Proxy 2단계 드라이브 다운로드 관리 훅
+│   ├── useMetadataSync.ts             # 로컬 Dexie와 Supabase(서버 프록시 경유) 간 하이브리드 동기화 훅
+│   └── useNetworkStatus.ts            # 15초 주기 능동 핑(/manifest.json) 기반 초정밀 온/오프라인 감지 훅
 ├── store/
-│   └── useStore.ts        # Zustand 전역 상태. 현재 열린 파일 ID, 선택된 텍스트, 페이지 번호 등을 컴포넌트 간 공유
+│   └── useStore.ts                    # Zustand 전역 상태 및 localStorage 자동 영속화(persist) 설정
 ├── lib/
-│   ├── db.ts              # Dexie.js 스키마 정의 (pdfCache 테이블, pdfMetadata 테이블)
-│   └── supabase.ts        # Supabase 클라이언트 초기화 설정
-├── auth.ts                # NextAuth v5 환경설정. GoogleProvider 클라이언트 키 및 토큰-세션 맵핑 로직 정의
-└── next.config.ts         # Next.js 설정 및 Serwist PWA 플러그인 연동
+│   ├── db.ts                          # Dexie.js 스키마 정의 (pdfCache, pdfMetadata, aiHistory 테이블 및 통계 유틸)
+│   ├── fetchWithSessionRetry.ts       # 401 Unauthorized 감지 시 세션 자동 리프레시 및 투명 1회 재시도 헬퍼
+│   ├── supabase.ts                    # Supabase 클라이언트 ('server-only' 격리, 안전한 서버 전용 DB 클라이언트)
+│   └── constants.ts                   # 앱 버전 정보, 안내 문구 등 UI 공용 상수 관리
+├── types/
+│   └── next-auth.d.ts                 # NextAuth 세션 및 JWT 커스텀 타입 확장 정의
+├── __tests__/                         # 컴포넌트, 훅, 스토어 단위/통합 테스트 스위트 (Jest)
+├── auth.ts                            # NextAuth v5 환경설정. 구글 OAuth 자격증명 및 리프레시 토큰 로직
+└── next.config.ts                     # Serwist PWA 플러그인 연동 및 6대 강력 HTTP 보안 헤더 설정
 ```
 
 ---
 
-## 4. 기능 테스트 제안 및 제한 조건 (Testing Guide)
+## 5. 상세 기능 명세 (Feature Specifications)
 
-성공적인 앱 작동과 오류 없는 기능 테스트를 위해 아래 사항들을 참고해 주세요.
+### 1. 구글 드라이브 연동, 자체 파일 탐색기 및 2단계 다운로드 (`DrivePickerModal`, `DownloadProgressModal`)
+- **OAuth 2.0 기반 안전한 인증**: Google Drive `drive.readonly` 스코프를 통해 사용자의 드라이브 파일 읽기 권한만 안전하게 획득합니다.
+- **사내 보안망 우회 자체 탐색기**: 구글 기본 Picker의 Iframe 차단 이슈를 원천 해결하기 위해 Drive REST API(`v3`)를 직접 조회하는 커스텀 UI를 구축했습니다.
+- **'내 서재' 폴더 핀(Pin) 고정**: PDF가 모여있는 특정 폴더로 이동한 후 상단의 핀(`[📌]`) 버튼을 누르면 해당 폴더가 기본 서재로 저장되어 다음 접속 시 해당 폴더로 자동 진입합니다.
+- **Direct-First / Proxy-Fallback 다운로드**: 파일 선택 시 실시간 진행률 바(`%`, `MB`)를 보여주며 브라우저 직접 다운로드를 우선 시도하고, CORS나 네트워크 제약으로 실패할 경우에만 사용자의 동의를 거쳐 Vercel 프록시 서버(`/api/drive/download`)로 우회 다운로드합니다.
 
-### **1. 필수 환경 변수 검증 (.env.local)**
-앱을 구동하기 전 아래 값들이 정상적으로 입력되어 있어야 합니다.
-- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`: 구글 클라우드 콘솔에서 발급한 OAuth 자격 증명
-- `NEXTAUTH_URL`: 로컬 테스트 시 `http://localhost:3000`
-- `NEXTAUTH_SECRET`: 임의의 난수 문자열 (세션 암호화 용도)
-- `GEMINI_API_KEY`: 구글 AI 스튜디오에서 발급받은 API 키 (결제/무료 한도 초과 여부 사전 점검 필요)
-- `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase 프로젝트 키
+### 2. 비로그인 및 오프라인 로컬 PDF 직접 열람 (`local-*` 모드)
+- **네이티브 파일 선택기 연동**: 로그아웃 상태이거나 오프라인 환경인 경우 브라우저 파일 선택기(`<input type="file">`)를 호출하여 기기에 저장된 PDF를 즉시 로컬 캐시(`Dexie.js`)로 복사해 열람할 수 있습니다.
+- **클라우드 동기화 원천 격리**: 기기에서 직접 연 파일은 `local-[UUID]` 형식의 고유 ID가 부여되며, 이후 사용자가 구글 로그인을 하더라도 백그라운드 동기화 봇(`manualSync`)이 의도적으로 건너뛰어(Bypass) 개인 문서의 외부 유출을 원천 방지합니다.
 
-### **2. 기능 테스트 흐름 및 체크포인트**
-1. **Google OAuth 로그인**:
-   - 우측 상단의 `Google 로그인` 버튼을 누르고 진행합니다. 
-   - **(제한 조건)**: 구글 클라우드 콘솔의 OAuth 동의 화면 설정에서 본인의 구글 계정이 테스트 사용자로 등록되어 있어야 로그인이 차단되지 않습니다.
-   - **(권한 확인)**: 로그인 시 체크박스로 표시되는 `Google Drive 파일 보기 및 다운로드(drive.readonly)` 권한을 반드시 **체크(허용)**해야 합니다.
-2. **Drive Picker 및 PDF 캐싱 테스트**:
-   - `드라이브 파일 열기` 버튼을 눌러 모달을 띄우고 PDF를 클릭합니다.
-   - 처음 로드 시에는 다운로드 딜레이가 발생하지만, 새로고침 후 같은 파일을 다시 열어 **0.1초 만에 로컬(Dexie)에서 렌더링**되는지 확인합니다.
-3. **텍스트 캡처 및 제미나이 스트리밍 테스트**:
-   - PDF 내부의 영어 텍스트를 마우스로 드래그합니다. 
-   - 우측 패널에 선택한 문장과 페이지가 잘 뜨는지 확인한 후 `한국어로 번역` 버튼을 클릭합니다.
-   - **(제한 조건)**: 앞서 `429 Quota Exceeded` 에러가 발생했던 경우처럼, 구글 AI 스튜디오 계정의 무료 제공량(Free Tier)이 초과되었거나 결제 카드가 누락되었을 경우 번역이 즉각 실패할 수 있습니다.
-4. **메타데이터 하이브리드 동기화 테스트**:
-   - 번역된 내용을 `메모로 저장`하고, PDF 상단 툴바의 `책갈피 아이콘`을 눌러 저장합니다.
-   - 브라우저의 개발자 도구(F12) -> `Application` 탭 -> `IndexedDB`에서 `SimpleReaderDB`에 데이터가 들어왔는지 확인합니다.
-   - 백그라운드에서 `/api/metadata/sync` API를 거쳐 Supabase 대시보드의 `pdf_metadata` 테이블에도 동일한 데이터가 업로드(Upsert) 되었는지 검증합니다. (새로고침을 해도 메모가 유지되어야 합니다)
-5. **구글 드라이브 전용 서재 지정 및 중첩 탐색 테스트**:
-   - 드라이브 모달을 열고 특정 폴더로 진입한 후 상단 경로(브레드크럼) 옆의 `[📌]` 핀 버튼을 클릭하여 서재로 지정합니다.
-   - 모달을 다시 열었을 때 해당 폴더 안의 PDF 항목들만 보여주는 '내 서재' 모드로 바로 진입하는지 확인합니다.
-6. **로컬 저장소 캐시 최적화 관리 테스트**:
-   - 헤더 우측의 `하드 드라이브` 아이콘을 클릭해 저장소 관리자 창을 엽니다.
-   - 캐시된 파일의 용량을 비우는 `[캐시 삭제]` 버튼을 클릭합니다.
-   - 캐시가 정상 삭제되더라도 파일에 연결된 메타데이터(메모 갯수 등)는 보존되어 오프라인에서도 조회 가능한지 확인합니다.
+### 3. 고성능 PDF 뷰어, 자동 이어읽기 및 도서 정보 (`PdfViewer`, `BookInfoModal`)
+- **다양한 보기 모드 및 상태 유지**: 단일 페이지 보기 및 세로 스크롤 연속 보기(Continuous Mode)를 지원하며, 마지막으로 읽던 파일과 보기 모드가 `localStorage`에 기억되어 재접속 시 즉시 이어 읽을 수 있습니다.
+- **멀티 디바이스 줌 인터랙션**: PC 마우스 휠(`Ctrl+Wheel`), 더블클릭, 모바일 두 손가락 핀치 줌(Pinch-to-zoom)을 모두 지원하며 지연 렌더링 스무딩을 통해 렉 없는 60fps 줌을 보장합니다.
+- **텍스트 캡처 플로팅 툴팁**: PDF 문장을 드래그하면 선택 영역 상단에 플로팅 툴바가 즉시 표시되어 클릭 한 번으로 `한국어로 번역`, `요약`, `메모 추가`를 실행할 수 있습니다.
+- **도서 정보 모달 (`BookInfoModal`)**: 상단 헤더에 표시된 현재 열람 중인 PDF 파일명을 클릭하면, 파일 전체 제목과 용량(MB), 현재 문서에 작성된 활성 메모 및 책갈피 개수를 요약해 보여줍니다.
+
+### 4. 제미나이 AI 번역/요약, 모델·프롬프트 커스텀 및 히스토리 (`AiAssistantPanel`)
+- **실시간 스트리밍 답변 및 직접 입력 지원**: PDF에서 드래그한 문장뿐만 아니라 입력창에 직접 텍스트를 타이핑하거나 수정하여 질의할 수 있으며, 토큰 단위 실시간 스트리밍 출력을 지원합니다.
+- **AI 모델 선택 및 커스텀 프롬프트**:
+  - 드롭다운을 통해 **`gemini-flash-lite-latest` (기본값)**, **`gemini-flash-latest`**, **`gemini-pro-latest`** 중 원하는 모델을 실시간으로 선택할 수 있습니다.
+  - 추가 요청사항 입력창(기본값: `"설명 없이 번역한 결과만"`)을 통해 `"경어체로 번역"`, `"전문용어 원문 병기"` 등 사용자 맞춤 지시사항을 즉시 반영할 수 있습니다.
+- **AI 질의 히스토리 자동 보관 (Auto Pruning)**:
+  - 번역이나 요약을 실행할 때마다 캡처한 원문 문장, AI 답변, 페이지 번호가 로컬 `aiHistory` 테이블에 자동 저장됩니다.
+  - 파일당 **최대 50개**의 최신 내역만 유지하며 초과 시 가장 오래된 기록을 자동 삭제하여 용량을 최적화합니다.
+  - '선택된 문장' 영역 좌측의 히스토리(`history`) 버튼을 눌러 과거 내역을 조회하고, 특정 항목을 클릭하면 당시의 원문과 AI 답변이 입력창에 즉시 복원됩니다.
+
+### 5. 하이브리드 메모장, 책갈피 및 휴지통 복구 시스템
+- **초고속 로컬 반영, 정렬 및 페이지 점프**: 메모 작성 및 책갈피 추가 시 로컬 IndexedDB에 즉시 저장된 후 백그라운드에서 클라우드로 동기화됩니다. 목록은 **최신순 / 페이지순**으로 정렬할 수 있으며, 항목 클릭 시 해당 PDF 페이지로 즉시 이동합니다.
+- **Soft Delete(논리적 삭제) 및 휴지통 모드**:
+  - 메모/책갈피 삭제 시 데이터를 즉시 파괴하지 않고 `deleted_at` 타임스탬프를 부여합니다.
+  - `메모·책갈피` 탭 상단의 휴지통(`delete`) 아이콘을 누르면 최근 삭제된 항목들만 모아볼 수 있는 휴지통 모드로 전환되며, 버튼 아이콘이 뒤로가기(`arrow_back`, "이전 목록으로 돌아가기")로 변경되어 현재 모드를 직관적으로 구별해 줍니다.
+  - 휴지통에서 '복구하기' 버튼을 누르면 로컬과 클라우드 DB 모두에서 삭제 플래그가 해제되어 완벽히 복원됩니다.
+  - 30일이 경과한 오래된 삭제 데이터는 클라이언트 동기화 루틴에 의해 로컬과 서버 양쪽에서 영구(물리) 삭제됩니다.
+
+### 6. 로컬 저장소 관리자 ('내 서재', `StorageManagerModal`)
+- **통합 서재 현황 시각화**: 기기에 바이너리가 캐시된 PDF(`드라이브 (캐시됨)`, `기기 파일 (오프라인 전용)`)뿐만 아니라, 캐시는 비워졌지만 클라우드/로컬에 메모·책갈피 기록이 남아있는 문서(`드라이브에만 있음`)까지 통합하여 용량(MB), 메모 수, 책갈피 수, 최종 열람일을 한눈에 보여줍니다.
+- **항목 클릭 즉시 열람 및 데이터 정리**: 목록의 책을 클릭하면 즉시 해당 책을 뷰어에서 열며, 개별 항목 삭제 또는 전체 삭제 시 로컬 PDF 캐시와 로컬/서버의 메타데이터를 깔끔하게 일괄 정리합니다.
+
+### 7. 앱 정보 모달 및 개인정보 보호 연동 (`Header`)
+- **헤더 로고 인터랙션**: 헤더 좌측의 `menu_book` 아이콘뿐만 아니라 `Simple Reader` 타이틀 텍스트 전체를 클릭하여 앱 정보 창을 팝업할 수 있습니다.
+- **테마 감응형 앱 아이콘**: 다크모드에서는 밝은 블루(`#d0ebff`), 라이트모드에서는 딥 블루(`#0044cc`)로 로고와 동일한 디자인의 앱 아이콘이 모달 상단에 렌더링됩니다.
+- **원클릭 서비스 워커 캐시 갱신**: "최신 버전으로 업데이트" 버튼을 누르면 기기에 등록된 서비스 워커 등록을 해제하고 캐시 스토리지를 전체 삭제한 뒤 앱을 강제 리로드합니다. (IndexedDB의 PDF 및 메모 데이터는 안전하게 보존됨)
+- **개인정보처리방침 외부 링크**: 모달 하단 좌측에 공식 개인정보처리방침(`https://landing-doohee2.vercel.app/privacy`) 링크를 배치하여 신뢰성을 확보했습니다.
 
 ---
 
-## 5. 핵심 컴포넌트 동작 원리 및 트러블슈팅 (Core Mechanisms & Troubleshooting)
+## 6. 핵심 컴포넌트 동작 원리 및 트러블슈팅 (Core Mechanisms & Troubleshooting)
 
-### **PDF 뷰어 (`react-zoom-pan-pinch` & `react-pdf`) 설정 및 상호작용 최적화**
-`PdfViewer.tsx`는 핀치 줌, 더블클릭 줌, 모바일 텍스트 드래그 등 다양한 사용자 상호작용이 충돌 없이 부드럽게 작동하도록 고도로 커스텀 설정되어 있습니다.
+### **A. PDF 뷰어 줌/스크롤 13대 고도화 엔진 (`PdfViewer.tsx`)**
+1. **앵커(Anchor) 기반 좌표 추적 및 `flushSync` 동기화 (스크롤 튐 방지)**:
+   - 줌 이벤트 발생 시 뷰포트 내의 클릭 포인트나 손가락 핀치 중심점을 기억하여, 해당 지점이 위치한 페이지 돔(`.react-pdf__Page`)과 상대적 비율(X%, Y%)을 저장합니다.
+   - `react-zoom-pan-pinch`의 CSS transform을 초기화한 후 `flushSync`로 React 렌더 트리를 동기 리플로우(Reflow)하고, 재계산된 화면 좌표에 맞게 `scrollLeft/scrollTop`을 보정하여 사용자가 읽고 있던 텍스트 위치를 한 픽셀의 오차 없이 고정합니다.
+2. **모바일 핀치 줌 정확도 향상**:
+   - `onTouchMove` 이벤트에서 두 손가락의 정확한 중심점(`pinchCenterRef`)을 초당 수십 회 추적하여 '사용자가 꼬집은 위치'를 정확한 줌 기준으로 삼습니다.
+   - 라이브러리의 상대적 스케일을 기존 스케일에 직접 곱하여 연속 핀치 줌 시 배율 왜곡을 방어합니다.
+3. **CSS Safe-Centering 기법 (좌측 스크롤 잘림 제한 해제)**:
+   - Flexbox의 `align-items: center` 적용 시 뷰포트를 초과하는 문서의 좌측이 잘려 스크롤할 수 없는 고질적 결함을 해결하기 위해 컨테이너를 `items-start`로 지정하고 내부 페이지에 `mx-auto w-max`를 적용했습니다. (작을 때는 중앙 정렬, 클 때는 좌측 벽 기준으로 팽창).
+4. **1손가락 터치 완벽 분리 및 핀치 줌 종료 폭주 방어 (Last Good State)**:
+   - 줌 라이브러리가 1손가락 스크롤을 가로채지 못하도록 터치 1개(`e.touches.length === 1`)는 `e.stopPropagation()`으로 차단합니다.
+   - 두 손가락 중 한 손가락이 먼저 떨어지는 찰나 라이브러리가 패닝으로 오인해 좌표가 급변하는 버그를 막기 위해, 정상 핀치 상태(`onPinch`)에서 기록된 마지막 정상 값(`lastGoodPinchStateRef`)만 최종 배율 커밋에 사용합니다.
+5. **모바일 텍스트 드래그 선택 안정화 (`selectionchange`)**:
+   - 모바일 핸들 드래그 완료 시점을 정확히 감지하기 위해 `document` 레벨의 `selectionchange` 이벤트를 300ms 디바운스로 추적하여 텍스트 선택 즉시 AI 패널로 전송합니다.
+6. **핀치 줌 중복 확대(Double-Scaling) 버그 해결**:
+   - 라이브러리의 비동기 RAF 애니메이션이 스케일을 덮어쓰며 배율이 121%로 증폭되는 현상을 막기 위해, 스케일 커밋 직전 `cancelAnimationFrame(instance.animation)`으로 진행 중인 애니메이션을 강제 취소합니다.
+7. **ArrayBuffer Detachment 에러 방지**:
+   - `react-pdf`가 ArrayBuffer 소유권을 Web Worker로 넘기면서 원본 길이가 0바이트로 분리(Detached)되는 현상을 방지하기 위해, 렌더링 직전 `ArrayBuffer.slice(0)`로 독립적인 복사본을 만들어 Worker에 전달합니다.
+8. **핀치 줌 깜빡임(Flickering) 개선 (Crossfade 유지)**:
+   - `<Page>` 컴포넌트의 `loading` 속성에 스피너를 할당할 경우 새 캔버스를 그리는 동안 기존 화면이 사라지는 문제를 해결하기 위해, `loading` 속성을 비워 `react-pdf`의 기본 동작인 '새 캔버스 완료 시까지 기존 캔버스 유지(Crossfade)'를 유도했습니다.
+9. **배율 목표치 미달(Undershoot) 보정 (Peak Scale Smoothing)**:
+   - 손가락을 뗄 때 미세하게 간격이 좁아지는 롤링 동작을 보정하기 위해 최근 300ms 동안의 스케일 기록 중 피크 배율(Peak Scale)을 찾아 스냅(Snap)합니다.
+10. **OOM(메모리 초과) 크래시 방지 및 동적 배율 제한**:
+    - 빠른 핀치 줌 반복 시 탭 강제 종료를 막기 위해 최대 배율을 5.0으로 안전하게 제한하고, `TransformWrapper`의 스케일 경계를 동적으로 하드 블록(Hard Block)합니다.
+11. **마우스 휠(Ctrl+Wheel) 줌 네이티브 가로채기 및 지연 렌더링**:
+    - 브라우저 네이티브 줌과의 충돌을 막기 위해 최상위 `window` 레벨에서 `wheel` 이벤트를 `capture: true`로 가로채 `preventDefault()`를 호출합니다.
+    - 휠을 돌리는 동안에는 가벼운 CSS `transform`만 60fps로 적용하고, 휠 조작이 끝난 후 150ms 뒤에 단 한 번만 고해상도 렌더링을 커밋합니다.
+12. **연속 보기 모드 페이지 간격 동적 연동**:
+    - CSS 변수 `--pdf-scale`을 주입하여 배율 변동에 비례하여 페이지 사이 여백이 자연스럽게 유지되도록 계산식(`calc(4px * var(--pdf-scale))`)을 적용했습니다.
+13. **줌 커밋 시 CSS Transition 충돌 방지**:
+    - transform 초기화 시 브라우저 전환 효과가 개입하여 화면이 축소되었다가 커지는 깜빡임을 막기 위해, 초기화 전후 및 `flushSync` 직후에 `transition: none !important`를 강제 주입합니다.
 
-1. **앵커(Anchor) 기반 좌표 추적 및 `flushSync` 동기화 (스크롤 튐 방지)**
-   - `react-zoom-pan-pinch`의 비동기 업데이트로 인한 시각적 깜빡임과 엉뚱한 스크롤 이동 현상을 방지하기 위해 `applyZoomWithAnchor` 로직이 적용되었습니다.
-   - 줌 이벤트 발생 시, 뷰포트 내의 클릭 포인트나 핀치 중심점을 기억하여 해당 지점이 위치한 특정 `.react-pdf__Page` 돔 요소와 그 내부의 상대적 X, Y 퍼센트 비율을 저장합니다.
-   - 라이브러리의 `transform`을 자바스크립트로 강제 초기화한 뒤, `flushSync`를 이용해 새 배율(scale)을 React에 동기적으로 리플로우(Reflow) 강제합니다. 그 후 다시 계산된 화면 좌표에 맞게 `scrollLeft/scrollTop`을 보정하여 어떤 배율이나 보기 모드에서도 보고 있던 텍스트 위치가 고정됩니다.
+---
 
-2. **모바일 핀치 줌(Pinch Zoom) 정확도 향상**
-   - **줌 중심점 추적:** `onTouchMove` 이벤트를 통해 두 손가락의 정확한 중심점(`pinchCenterRef`)을 초당 수십 회 기록하여, 줌 종료 시 단순히 화면 중앙이 아닌 '사용자가 꼬집은 위치'를 정확히 확대/축소의 기준으로 삼습니다.
-   - **배율 왜곡 방지:** 라이브러리가 던져주는 `ref.state.scale` 값은 항상 1부터 시작하는 상대적 배율이므로, 기존 스케일에서 나누지 않고 직접 곱하여 연속적인 핀치 줌에도 배율이 엉뚱하게 축소되지 않도록 보정합니다.
-   - **연속 모드 페이지 판별:** 세로로 길게 늘어선 연속보기 모드에서 중심점 최단거리(`Math.sqrt`)로 앵커 페이지를 찾을 경우 오작동이 잦습니다. 이를 해결하기 위해 Y좌표가 실제 페이지의 `top`과 `bottom` 영역 안에 존재하는지 수직 포함(Intersection) 여부를 1순위로 판별하는 견고한 탐색 로직을 도입했습니다.
+### **B. 하이브리드 서버 프록시 동기화 엔진 (`useMetadataSync.ts` & `/api/metadata/sync`)**
+1. **서버 API 프록시 전환 배경 (다중 앱 보안 격리)**:
+   - 하나의 Supabase 인스턴스를 여러 애플리케이션이 공유하는 환경에서 브라우저에 `NEXT_PUBLIC_SUPABASE_ANON_KEY`를 노출하면 잠재적 보안 위험이 발생할 수 있습니다.
+   - 이를 원천 차단하기 위해 브라우저에서 Supabase SDK를 완전히 제거하고, 모든 요청이 Next.js 서버 라우트(`/api/metadata/sync`)를 경유하도록 개편했습니다.
+   - `lib/supabase.ts`에 `import "server-only"`를 적용하여 클라이언트 번들에 DB 코드가 섞이는 것을 빌드 타임에 차단합니다.
+2. **서버 세션 강제 인가 (Session Overriding)**:
+   - 클라이언트가 변조된 `user_id`를 담아 API로 보내더라도, 백엔드 API 라우트에서 `auth()`를 통해 세션 쿠키를 검증하고 진짜 구글 계정 식별자(`userId`)로 데이터를 강제 덮어씌워 타인의 데이터를 조작하거나 조회하는 공격을 원천 차단합니다.
+3. **이메일 기반 사용자 식별자 단일화**:
+   - 구글 OAuth 특성상 기기나 브라우저에 따라 `user.id(sub)`가 다르게 발급되는 현상을 방지하기 위해 변하지 않는 구글 계정의 `email`을 최우선 식별자로 통일했습니다.
+4. **비로그인 지연 동기화 (`isUnsynced: true`)**:
+   - 로그아웃 상태에서 작성된 메모/책갈피는 `isUnsynced: true` 플래그와 함께 로컬에 보관되며, 사용자가 로그인하는 순간 동기화 훅이 이를 감지하여 클라우드로 일괄 병합(Batch Upsert)합니다.
 
-3. **CSS Safe-Centering 기법 (좌측 스크롤 잘림 제한 해제)**
-   - Flexbox의 `align-items: center` 적용 시, 문서가 뷰포트보다 커지면 화면 좌측 영역으로 오버플로우된 부분이 잘려 스크롤로 접근할 수 없는 고질적 문제가 발생합니다.
-   - 이를 해결하기 위해 모든 상위 래퍼 컨테이너는 항상 `items-start`(왼쪽 정렬)로 통일하고, 단일 및 연속 페이지 내부 래퍼(`LazyPage`)에 **`mx-auto w-max`** 클래스를 적용했습니다. 문서가 뷰포트보다 작을 때는 `margin: auto`를 통해 완벽히 중앙에 배치되고, 화면을 넘어갈 경우 자동으로 왼쪽 벽을 기준으로 자연스럽게 팽창하여 양방향 스크롤을 100% 지원합니다.
+---
 
-4. **1손가락 터치 완벽 분리 및 핀치 줌 종료 폭주 방어 (Last Good State 방식)**
-   - **1손가락 스크롤 보호:** 줌 라이브러리가 1손가락 터치 이벤트를 가로채어 세로 스크롤을 막는 것을 방지하기 위해 `pdfWrapperRef`에 `onTouchStart`/`onTouchMove` 이벤트 리스너를 달아, 손가락 1개(`e.touches.length === 1`)의 이벤트는 `e.stopPropagation()`으로 차단합니다.
-   - **핀치 줌 드롭 문제의 근본 원인:** 라이브러리 소스 분석 결과(`index.esm.js:1879-1898`), 핀치 줌(2손가락) 중 한 손가락이 먼저 떨어지는 찰나에 `touchmove`가 `touches.length === 1`로 발생하면, 라이브러리가 이를 **1손가락 패닝으로 오인**하여 남은 손가락 위치로 `handlePanning()`을 실행합니다. 이 순간 라이브러리 내부의 transform 좌표(positionX, positionY)가 급변(Focal Point Snapping)하며, 직후의 `onTouchPanningStop`(`index.esm.js:1900-1903`)에서 `onPinchStop`이 호출될 때 `ref.state`는 이미 오염된 상태입니다.
-   - **해결 방식 (Last Good State):** 라이브러리의 공식 콜백 `onPinch`는 반드시 `event.touches.length > 1`(정상적인 2손가락 핀치) 일 때만 호출됩니다(`index.esm.js:1896`). 따라서 `onPinch` 콜백에서 매 프레임 `ref.state`(scale, positionX, positionY)를 `lastGoodPinchStateRef`에 저장해 둡니다. `onPinchStop` 시점에서는 오염 가능성이 있는 `ref.state`를 무시하고, 저장해둔 마지막 정상 상태의 scale 값을 사용하여 `applyZoomWithAnchor`를 호출합니다.
-   - **이벤트 핸들러 다이어트:** 효과가 없었던 Pointer Event Trap 코드(`onPointerDownCapture`, `onPointerUpCapture`, `onPointerCancelCapture`, `activePointersRef`)는 전량 제거되었습니다. 라이브러리가 Pointer 이벤트를 전혀 사용하지 않고 Touch 이벤트만 사용하기 때문입니다.
+### **C. 세션 지속성 및 자동 복구 (Session Persistence)**
+1. **치명적/일시적 실패 분리 (`auth.ts`)**:
+   - Access Token 갱신 실패를 `invalid_grant`(권한 철회 등 치명적 오류)와 일시적 네트워크 오류로 구분했습니다. 일시적 실패 시 강제 로그아웃을 유발하지 않고 기존 토큰을 유지해 UX 단절을 방지합니다.
+2. **`fetchWithSessionRetry` 공용 헬퍼 도입**:
+   - API 호출 중 401(토큰 만료) 응답을 만나면 내부적으로 NextAuth의 `getSession()`을 호출해 토큰을 최신으로 갱신한 뒤, 투명하게 1회 자동 재시도합니다. (드라이브 목록, 다운로드, AI 번역, 동기화 전반에 적용).
+3. **사전 갱신(Early Refresh) 및 180일 장기 세션**:
+   - 토큰 만료 60초 전부터 사전 갱신을 시도하며, 브라우저 세션 쿠키 수명(`maxAge`)을 **180일**로 대폭 연장하여 재로그인 피로도를 최소화했습니다.
 
-5. **모바일 텍스트 드래그 선택 안정화 (selectionchange)**
-   - 모바일 환경(롱 프레스 후 핸들 드래그)에서는 `onMouseUp`이나 `onTouchEnd` 이벤트로 텍스트 선택 완료 시점을 정확히 잡을 수 없습니다. 
-   - `document` 레벨에서 **`selectionchange`** 이벤트를 감지하되, 빈번한 이벤트 호출로 인한 성능 저하를 막기 위해 300ms 디바운스(Debounce)를 적용하여 사용자가 드래그를 끝마치는 순간 빠르고 정확하게 선택 영역을 AI 입력 패널로 전송합니다.
+---
 
-6. **핀치 줌 중복 확대(Double-Scaling) 버그 해결 (RAF 비동기 애니메이션 제어)**
-   - **현상:** 110%로 핀치 줌을 시도했을 때, `react-pdf` 캔버스와 라이브러리의 CSS `transform` 배율이 이중으로 적용되어 화면이 121%로 증폭되는 문제 발생.
-   - **발생 원인 (Race Condition):** 
-     1) 라이브러리 내부 `handlePinchStop`이 실행되면서 `handleAlignToScaleBounds` 로직이 비동기 RAF(requestAnimationFrame) 애니메이션을 시작할 수 있음.
-     2) 이 직후 개발자 콜백 `onPinchStop`에서 `setTransform(0,0,1,0)`을 호출하여 라이브러리 스케일을 1.0으로 강제 리셋하고 `flushSync`를 통해 `react-pdf` 렌더링에 새 배율을 적용.
-     3) 하지만, 이전에 라이브러리가 시작해둔 **비동기 RAF 애니메이션이 다음 프레임에 실행되면서** 이전 스케일(1.1)을 라이브러리의 `state.scale`에 다시 덮어씀. 결과적으로 CSS Transform 스케일이 1.1로 롤백되어 이중 확대(Double-scaling) 현상 초래.
-   - **해결 로직:** `applyZoomWithAnchor` 내부에서 `setTransform`을 호출하기 직전에 `cancelAnimationFrame(instance.animation)`을 호출하여 라이브러리의 **진행 중인 모든 비동기 애니메이션을 강제 취소**하고, `instance.state`를 직접 `1.0`으로 덮어씀으로써 애니메이션에 의한 롤백 부수 효과를 완벽히 차단함.
+### **D. PWA 오프라인 우선(Offline-First) 설계 및 캐시 보안**
+1. **5대 정밀 서비스 워커 런타임 캐싱 전략 (`sw.ts`)**:
+   - **외부 리소스** (Google Fonts, OAuth 아바타): `StaleWhileRevalidate` (유효기간 30일).
+   - **내부 정적 자산** (`/_next/static/**`, 이미지/CSS): `CacheFirst` (유효기간 1년, 제로 레이턴시).
+   - **HTML 문서**: `StaleWhileRevalidate` (캐시 앱 셸 즉시 반환 후 백그라운드 갱신).
+   - **Next.js RSC 데이터**: `StaleWhileRevalidate` (오프라인 페이지 전환 보장).
+   - **API 라우트** (`/api/*`): `NetworkFirst` (5초 타임아웃, 오프라인 시 로컬 폴백).
+2. **초정밀 능동 회선 판독기 (`useNetworkStatus.ts`)**:
+   - `navigator.onLine`의 가짜 온라인 신호에 속지 않도록, 15초 주기 및 윈도우 포커스 시 `/manifest.json?_t=...`로 `HEAD` 요청(1.2초 타임아웃)을 날려 실제 통신 가능 여부를 검증합니다.
+   - 오프라인 판정 시 React Query 재시도를 즉각 차단하여 무한 로딩을 방지하고 헤더에 빨간색 오프라인 펄스 배지를 띄웁니다.
+3. **로그아웃 시 오프라인 캐시 폭파 (Cache Purging)**:
+   - 공용 PC 환경 보호를 위해 로그아웃 클릭 시 `window.caches.keys()`를 순회하여 브라우저에 저장된 서비스 워커 캐시를 완전히 삭제합니다.
 
-7. **ArrayBuffer Detachment 에러 (Web Worker 통신 크래시) 방지**
-   - **현상:** 로컬 캐시(IndexedDB)에서 읽어온 PDF 파일을 열람 중 메모 작성이나 확대 등으로 리렌더링이 발생하면 `Cannot read properties of null (reading 'sendWithPromise')` 에러가 발생하며 앱이 중단됨.
-   - **발생 원인:** `react-pdf`가 메인 스레드의 메모리 부하를 줄이기 위해 `ArrayBuffer`의 소유권을 `pdf.js` 웹 워커로 넘김(Transfer). 이 과정에서 원본 버퍼 길이는 0바이트(Detached)가 되며, 이후 상태 변경으로 `<Document>`가 리렌더링될 때 비워진 버퍼를 워커에 다시 전달하려다 크래시 발생.
-   - **해결 로직:** `fileData` 렌더링 직전에 `useMemo`와 `.slice(0)`를 사용해 `ArrayBuffer`의 복사본(Clone)을 생성하여 전달하도록 수정. 워커가 복사본의 소유권을 가져가더라도 메인 스레드의 원본 데이터는 보존되므로, 빈번한 리렌더링에도 안정성을 확보함.
+---
 
-8. **핀치 줌 깜빡임(Flickering) 개선 (로딩 언마운트 방어)**
-   - **현상:** 핀치 줌이 끝나고 고해상도 캔버스가 다시 그려지는 찰나의 순간 화면이 하얗게 번쩍이는 현상.
-   - **발생 원인:** `<Page>` 컴포넌트의 `loading` 속성에 스피너(`Loader2`)를 할당할 경우, `react-pdf`가 새 캔버스를 그리는 동안 기존 캔버스를 언마운트(제거)하고 스피너를 보여주게 되어 렌더링 공백이 발생함.
-   - **해결 로직:** `loading` 속성을 제거하여 `react-pdf`의 기본 동작인 **'새 캔버스가 렌더링될 때까지 기존 캔버스 유지(Crossfade)'**를 유도함으로써 깜빡임을 원천 제거함.
+### **E. 보안 하드닝 (Zero-Leak & Security Hardening)**
+1. **환경변수 격리 (Zero-Leak)**:
+   - `GEMINI_API_KEY`, `GOOGLE_CLIENT_SECRET`, `NEXTAUTH_SECRET`, `SUPABASE_URL`, `SUPABASE_ANON_KEY` 등 모든 기밀 키에서 `NEXT_PUBLIC_` 접두사를 완전히 제거하여 브라우저 자바스크립트 번들에 포함되지 않도록 보장합니다.
+2. **입력 검증 및 에러 메시지 위생화**:
+   - 모든 API 요청은 `zod` 스키마를 통해 검증하며, 외부 통신 오류 시 상세 스택 트레이스는 서버 콘솔에만 남기고 클라이언트에는 `"요청을 처리할 수 없습니다."` 또는 표준 에러 포맷으로 위생화하여 반환합니다.
+3. **Vercel 6대 강력 HTTP 보안 헤더 (`next.config.ts`)**:
+   - `Content-Security-Policy` (CSP): 안전한 외부 폰트/CDN만 허용하고 비인가 스크립트 실행 차단
+   - `Strict-Transport-Security` (HSTS): 2년간 HTTPS 접속 강제
+   - `X-Frame-Options`: `DENY` (iframe 클릭재킹 차단)
+   - `X-Content-Type-Options`: `nosniff` (MIME 스니핑 방지)
+   - `Referrer-Policy`: `strict-origin-when-cross-origin`
+   - `Permissions-Policy`: `camera=(), microphone=(), geolocation=()`
 
-9. **배율 목표치 미달(Undershoot) 보정 (Peak Scale Smoothing)**
-   - **현상:** 두 손가락으로 화면을 크게 확대한 뒤 손을 떼는 순간, 배율이 의도보다 살짝 줄어든 상태로 고정되는 현상.
-   - **발생 원인:** 손가락을 뗄 때 미세하게 손가락 간격이 좁아지는 무의식적인 롤링(Rolling) 동작 때문에 줌 아웃으로 판정됨.
-   - **해결 로직:** 핀치 줌 도중 최근 300ms 동안의 배율 스케일 기록(`pinchHistoryRef`)을 추적하여, 줌 종료 시 해당 기록 중 가장 높았던(또는 가장 낮았던) **피크 배율(Peak Scale)을 찾아 최종 배율로 고정(Snap)**하는 스무딩 보정 알고리즘 적용.
+---
 
-10. **잦은 핀치 줌 시 OOM 크래시 방지 및 동적 배율 제한**
-   - **현상:** 모바일에서 빠르게 핀치 줌을 여러 번 반복할 때 브라우저 탭이 강제 종료되거나 `sendWithPromise` Null 에러가 발생하는 현상.
-   - **발생 원인:** 배율 한계(8.0)가 너무 높아 거대한 캔버스 렌더링 요청이 Worker에 과도하게 쌓이며 OOM(메모리 초과)이 발생함. 또한 줌 속도가 `SPIKE_DROPPED` 임계치(10%)를 넘으면 배율 업데이트가 잠겨버리는 버그 발생.
-   - **해결 로직:** 최대 배율 한계를 5.0으로 낮추고, `TransformWrapper`의 `minScale`/`maxScale`을 현재 배율(`currentScale`)에 기반하여 동적 계산함으로써 절대 한계치(0.5 ~ 5.0)를 하드 블록(Hard Block)함. 추가로 `pinchSpikeThreshold` 기본값을 50%로 대폭 상향하여 빠른 줌 동작에서의 배율 잠김 현상을 해결함.
+## 7. 환경 변수 설정 (.env.local)
 
-11. **마우스 휠(Ctrl+Wheel) 줌 무한 루프 및 깜빡임(Flickering) 해결**
-    - **현상:** `Ctrl + 마우스 휠` 줌 시 브라우저 네이티브 줌이 발동해 화면 뷰포트가 변경되면서 `ResizeObserver`와 충돌하여 무한 확장이 발생하거나, 줌 도중 화면이 과도하게 깜빡이는 현상.
-    - **발생 원인:** `react-zoom-pan-pinch` 라이브러리의 휠 감지 로직이 포커스를 잃었을 때 제대로 동작하지 않아 브라우저 네이티브 줌 제어권을 빼앗김. 또한 휠을 돌릴 때마다 무거운 `react-pdf` 고해상도 렌더링이 동기적(`flushSync`)으로 발생해 깜빡임 유발.
-    - **해결 로직:** 
-      - 라이브러리의 휠 로직을 완전히 끄고, 최상위 `window` 레벨에서 `wheel` 이벤트를 `capture: true`로 가로채어 `e.preventDefault()` 및 `e.stopPropagation()`을 호출해 네이티브 줌과 라이브러리 간섭을 원천 차단함.
-      - 휠을 굴리는 도중에는 가벼운 CSS `transform`(`instance.setTransform`)만 60fps로 적용하여 깜빡임을 없애고, 휠 조작이 완전히 끝난 후 150ms가 지났을 때 단 한 번만 고해상도 렌더링(`applyZoomWithAnchor`)을 커밋하는 '지연 렌더링 스무딩(Deferred Rendering Smoothing)' 아키텍처를 구현함.
-      - 리더 영역 내부와 외부의 휠 이벤트를 명확히 분리하여, 리더 영역 외부에서의 휠 조작은 혼란 방지를 위해 안전하게 무시(차단)하도록 안정성을 강화함.
+앱 실행 및 배포를 위해 아래 환경 변수들이 안전하게 구성되어야 합니다.
 
-12. **연속 보기 모드(Continuous Mode) 페이지 간격 동적 연동 및 최적화**
-    - **현상:** 연속 보기 모드에서 핀치 줌이나 마우스 휠로 확대/축소 시, 페이지 사이의 여백이 줌 배율을 따라가지 못해 지나치게 벌어지거나 좁아져 화면이 겹치는 어색함 발생.
-    - **해결 로직:** `PdfViewer`의 최상위 컨테이너에 CSS 변수 `--pdf-scale`을 주입하고, `LazyPage`의 `marginBottom`과 `minHeight` 속성에 `calc(value * var(--pdf-scale))`을 적용하여 배율 변동에 비례하여 여백도 자연스럽게 증감하도록 설계. 또한 사용성을 위해 기본 여백을 1/4(4px) 수준으로 대폭 축소함.
+```ini
+# Google OAuth 자격 증명 (Google Cloud Console)
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
 
-13. **줌 커밋 시 CSS Transition 충돌에 의한 깜빡임 방지 및 성능 최적화**
-    - **현상:** 핀치 줌, 더블클릭 줌, 마우스 휠 줌, Fit 버튼 클릭 등 배율이 변경되는 모든 동작에서 캔버스가 새로 그려지는 찰나에 화면이 미세하게 깜빡이거나 축소되었다가 팽창하는 현상.
-    - **발생 원인:** `react-zoom-pan-pinch` 라이브러리의 `setTransform()` API가 내부적으로 CSS `transition` 속성을 재설정할 수 있으며, `applyZoomWithAnchor`나 `handleFit`에서 CSS transform을 `""`으로 초기화할 때 브라우저가 이전 배율에서 1.0으로 줄어드는 전환 애니메이션을 발동시켜 시각적 깜빡임을 유발함.
-    - **해결 로직:**
-      - **`applyZoomWithAnchor` 함수:** CSS transform 초기화 직전, `setTransform(0,0,1,0)` 호출 직후, 그리고 `flushSync` 이후의 **3개 지점** 모두에서 `style.setProperty("transition", "none", "important")`를 강제 주입하여 어떤 경로에서든 전환 애니메이션이 끼어들 수 없도록 완벽 차단함.
-      - **`handleFit` 함수:** 동일하게 transform 초기화 전에 transition을 차단하여 Fit 버튼 클릭 시의 깜빡임도 제거함.
-      - **`onTransform` 콜백 최적화:** 핀치 줌 중 초당 수십 회 호출되는 `onTransform`에서 `scaleDisplayRef.current.innerText` 할당 전에 이전 값과 동일한지 비교하는 가드를 추가하여 불필요한 DOM 텍스트 노드 교체와 미세 리플로우를 방지함.
-      - **페이지 래퍼 크기 사전 고정:** 단일 보기 및 연속 보기 모드의 페이지 래퍼 `div`에 `pageBaseWidth`와 `pageBaseHeight` 비율 기반의 명시적 `width`/`height`를 사전 부여하여, `react-pdf` 캔버스가 비동기로 그려지기 전에도 레이아웃이 확정되어 스크롤 좌표 재계산이 정확해지고 레이아웃 시프트(Layout Shift)에 의한 시각적 튕김을 방지함.
+# NextAuth v5 설정
+NEXTAUTH_URL=http://localhost:3000   # 배포 시 실제 도메인 (예: https://simple-reader.vercel.app)
+NEXTAUTH_SECRET=your-random-secret-key-32-chars-minimum
 
-### **메타데이터 하이브리드 동기화 (Hybrid Sync Engine) 구조 개선**
-다중 기기(PC/모바일) 환경에서 메모와 책갈피를 오차 없이 동기화하기 위해 다음과 같은 고도화된 아키텍처가 적용되었습니다.
+# Google Gemini AI API 키 (Google AI Studio)
+GEMINI_API_KEY=AIzaSyYourGeminiApiKeyHere
 
-1. **식별자 통일 (Email-based User ID)**
-   - NextAuth(Auth.js)의 세션(JWT) 특성상 기기나 브라우저 캐시에 따라 `user.id (sub)`가 난수로 다르게 발급되는 불확실성을 방지하기 위해, 절대 변하지 않는 구글 계정의 `email`을 최우선 식별자(`userId`)로 사용합니다. 이로써 어느 기기에서 접속하든 완벽하게 동일 사용자로 매칭됩니다.
+# Supabase 백엔드 전용 자격 증명 (NEXT_PUBLIC_ 접두사 없음, 서버 API 프록시 전용)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-supabase-anon-key
+```
 
-2. **Soft Delete (논리적 삭제) 및 30일 자동 영구 삭제**
-   - 데이터 보존 및 기기 간 삭제 상태 동기화를 위해 즉시 삭제(Hard Delete) 대신 `deleted_at` 필드에 시간을 기록하는 논리적 삭제 방식을 채택했습니다.
-   - 서버에서 `deleted_at`을 내려받은 다른 로컬 기기는 스스로 Dexie DB에서도 해당 데이터를 숨김/삭제 처리하여 동기화합니다.
-   - 앱 내 백그라운드 동기화(`syncWithServer`) 실행 시, 클라이언트 자체에서 30일이 초과된 삭제 데이터들을 추적하여 로컬과 서버(Supabase) 양쪽에서 깔끔하게 영구(물리) 삭제 처리하므로 별도의 DB 스케줄러 세팅이 필요 없습니다.
+> [!IMPORTANT]
+> **Vercel 배포 시 주의사항**: `SUPABASE_URL` 및 `SUPABASE_ANON_KEY`는 브라우저가 아닌 Vercel Serverless Function에서만 사용되므로 환경변수 이름에 `NEXT_PUBLIC_`을 붙이지 않아야 완벽한 정보 은닉이 유지됩니다.
 
-3. **네트워크 최적화 동기화 트리거 (Polling & Manual Sync)**
-   - 탭 전환 시마다 통신을 유발하던 `window.focus` 리스너와 리소스를 낭비하던 Supabase Realtime WebSocket을 걷어냈습니다.
-   - 앱 초기 실행 시 1회, 이후 **10분 주기 정기 폴링(setInterval)**으로 조용히 백그라운드 동기화를 수행합니다.
-   - 즉각적인 동기화가 필요한 경우를 위해, UI 하단에 **"서버와 즉시 동기화" (Manual Sync)** 버튼을 배치하였으며 `useRef` 잠금 장치로 무한 루프나 중복 실행을 방지하는 안전한 수동 동기화를 제공합니다.
+---
 
-4. **비로그인 로컬 모드 및 지연 동기화(Lazy Sync) 지원**
-   - **오프라인 퍼스트 경험:** 사용자가 로그아웃 상태이더라도 헤더의 `내 서재`를 통해 캐시된 PDF를 열람하고, 메모와 책갈피를 제한 없이 작성할 수 있도록 개편했습니다. 
-   - **`isUnsynced` 플래그 시스템:** 비로그인 상태에서 작성 및 수정된 데이터는 로컬 DB(`Dexie`)에만 보관되며 내부적으로 `isUnsynced: true` 플래그가 부여됩니다. 앱 내 메모 패널과 툴바에서 '구름 아이콘(동기화 대기중)'이 표시되어 시각적 피드백을 제공합니다.
-   - **로그인 시 자동 업로드 연동:** 사용자가 이후 구글 계정으로 로그인하게 되면, 앱 내의 동기화 훅이 이를 감지하고 로컬의 비동기 데이터들을 모아 `Supabase` 서버로 일괄 병합(upsert)하며, 업로드 성공 시 플래그를 해제하여 매끄러운 오프라인-온라인 하이브리드 연동을 달성했습니다.
+## 8. 기능 테스트 가이드 (Testing & Verification Guide)
 
-5. **오프라인 다이렉트 로컬 파일 지원 (비동기화 격리 모드)**
-   - **브라우저 네이티브 탐색기 연동:** 로그아웃 상태일 경우 구글 드라이브 모달 대신 브라우저 기본 파일 선택기(`<input type="file">`)를 호출하여, 로컬 기기의 PDF를 즉시 `Dexie` 캐시로 복사 및 렌더링합니다.
-   - **클라우드 동기화 원천 차단:** 로컬에서 직접 불러온 파일은 `local-` 접두사가 붙은 고유 ID를 부여받습니다. 이 파일에서 작성된 메모나 책갈피는 사용자가 이후 로그인을 하더라도 백그라운드 봇(`manualSync`)이 의도적으로 동기화를 건너뛰어(Bypass) 기기 밖으로 데이터가 유출되는 것을 방지합니다.
-   - **시각적 UI 분리:** '내 서재' 모달 내에서 로컬 전용 파일은 별도의 기기(Monitor) 아이콘 및 전용 배지로 표시되어, 구글 드라이브 연동 파일과 직관적으로 구분할 수 있습니다.
-
-6. **모바일 환경 터치(Hover) 접근성 개선**
-   - **모바일/PC 맞춤형 UI 반응성:** 모바일(터치 환경)에서는 마우스 호버(Hover)가 불가능하여 책갈피 및 메모의 수정/삭제 아이콘이 숨겨지는 문제를 해결했습니다. `md:` 브레이크포인트를 활용하여 모바일 화면에서는 조작 아이콘을 상시 노출(`opacity-100`)시키고, 마우스가 지원되는 PC 환경(`md` 이상)에서는 호버 시에만 나타나게(`md:opacity-0 md:group-hover:opacity-100`) 분리 적용하여 조작 편의성과 깔끔한 UI를 동시에 만족시켰습니다.
-
-7. **책갈피/메모 휴지통 및 복구 기능 (Soft Delete Recovery)**
-   - **휴지통 모드 UI:** `메모·책갈피` 탭 상단에 휴지통 버튼을 추가하여, 최근 30일 이내에 삭제된 내역만 별도로 모아볼 수 있는 전용 보기 모드(`isViewingTrash`)를 제공합니다.
-   - **복구 메커니즘:** 휴지통에서 항목의 '복구하기'(`restore_from_trash`) 버튼을 누르면, 내부적으로 `deletedAt` 값을 제거(로컬 Dexie)하고 서버 DB(Supabase)에서도 `null`로 업데이트하여 데이터를 완벽하게 원상 복원합니다.
-
-8. **AI 번역/요약 내역 조회(히스토리) 기능**
-   - **로컬 캐싱 스키마 도입:** 제미나이 AI의 번역 및 요약 결과를 `aiHistory` Dexie DB 테이블에 저장하여, 동일 파일 내에서 과거에 캡처했던 텍스트와 결과값을 시간 역순으로 자동 저장합니다.
-   - **오토 푸루닝(Auto Pruning):** 파일당 최대 50개의 내역만 유지하도록 설정하여, 한도가 초과될 경우 가장 오래된 기록을 자동으로 밀어내어 무분별한 용량 차지를 방지합니다.
-   - **즉각적인 상태 복원:** '선택된 문장' 영역 좌측의 히스토리 버튼을 눌러 과거 기록을 조회할 수 있으며, 원하는 항목을 클릭하면 당시 캡처했던 원문과 AI 답변이 메인 화면으로 즉시 로드(Restore)되어 작업 흐름을 끊김 없이 이어갈 수 있습니다.
-
-### **Google OAuth 세션 유지 및 토큰 갱신 안정화 (Session Persistence)**
-1. **치명적/일시적 실패 분리 (`auth.ts` 고도화):** Access Token 갱신 실패를 **치명적 실패(`invalid_grant`, 권한 철회 등)**와 **일시적 실패(네트워크 오류 등)**로 구분했습니다. 치명적 실패 시에만 강제 로그아웃 처리되며, 일시적 실패는 기존 토큰을 반환해 묵인하고 다음 요청 시 재시도하도록 완화하여 UX 단절을 막았습니다.
-2. **`fetchWithSessionRetry` 공용 헬퍼 도입:** API 통신 시 401 에러를 만났을 때 즉시 로그아웃 하던 낡은 동작을 폐기하고, 내부적으로 세션을 리프레시(`getSession()`)하여 토큰을 갱신한 뒤 1회 자동 투명 재시도하는 공통 방어 로직을 구현했습니다. 이를 `DrivePickerModal`, `usePdfFile`, `AiAssistantPanel` 등 핵심 통신부에 전면 적용했습니다.
-3. **사전 갱신(Early Refresh) 및 장기 세션:** 토큰 갱신이 원활하게 진행될 수 있도록 토큰 만료 60초 전부터 사전 갱신을 시도하며, 브라우저 세션 쿠키 수명(`maxAge`)을 **180일**로 대폭 늘려 다시 로그인해야 하는 번거로움을 획기적으로 줄였습니다.
-
-### **PWA 오프라인 우선(Offline-First) 아키텍처**
-네트워크가 불안정하거나 완전히 끊긴 환경에서도 앱이 0.1초 컷으로 화면을 띄우고, 모든 핵심 기능(PDF 열람, 메모, 책갈피)이 정상 작동하도록 다음과 같은 아키텍처가 적용되었습니다.
-
-1. **서비스 워커 캐싱 전략, 외부 리소스 격리 및 아이콘 FOUT 방어 (`sw.ts`, `app/layout.tsx`, `Header.tsx`)**
-   - Serwist(Workbox 후속)의 런타임 캐싱 전략을 자산 유형 및 Origin 특성에 따라 5가지로 정밀하게 분리 적용함.
-   - **외부(Cross-Origin) 도메인 리소스** (구글 폰트/스타일, 구글 OAuth 아바타, 외부 CDN 등): `StaleWhileRevalidate` — 정적 자산 규칙보다 상위에 배치하여 구글 프로필 및 Material Symbols 폰트 등이 오프라인에서도 보이며 백그라운드에서 유연하게 갱신됨. Opaque(상태코드 0) 응답 충돌 방지 및 영구 박제 차단을 위해 `CacheableResponsePlugin({ statuses: [0, 200] })` 및 유효기한 30일(`maxAgeSeconds: 30일`) 명시.
-   - **내부(Self Origin) 정적 고정 자산** (`/_next/static/**`, 내부 JS/CSS/폰트/로컬 이미지): `CacheFirst` — 당사 빌드 산출물 및 불변 정적 자산은 1년짜리(`maxAgeSeconds: 1년`) CacheFirst 정책을 확실히 유지하여 제로 레이턴시 오프라인 즉각 로딩 실현.
-   - **HTML 문서** (`request.mode === 'navigate'`): `StaleWhileRevalidate` — 캐시된 앱 셸을 즉시 보여주고 백그라운드에서 최신 버전을 갱신. 오프라인에서도 멈춤 없이 화면 표시.
-   - **Next.js RSC 데이터** (`_rsc`, `_next/data`): `StaleWhileRevalidate` — 오프라인에서도 페이지 전환이 멈추지 않도록 캐시된 RSC 페이로드를 즉시 반환.
-   - **API 호출** (`/api/`): `NetworkFirst` (5초 타임아웃) — 최신 데이터 우선, 오프라인 시 캐시 폴백.
-   - **아이콘 글자 깜빡임(FOUT) 및 엑박 방어 UX:** `app/layout.tsx`에서 Google Fonts 및 Material Symbols 로딩 시 Preconnect(`https://fonts.googleapis.com`, `https://fonts.gstatic.com`)를 추가하고 파라미터를 `display=block`으로 설정하여 아이콘 다운로드 전 `search`, `calendar_month` 등 원문 글자 텍스트가 깜빡거리며 화면에 노출되는 FOUT 현상을 차단함. `Header.tsx`에서는 아바타 로딩 실패 시 `onError` 핸들러로 `account_circle` 기본 아이콘 전환을 지원함.
-
-2. **iOS Standalone 앱 지원 (`layout.tsx`)**
-   - `Metadata.appleWebApp` 속성에 `capable: true`, `statusBarStyle: "black-translucent"`, `title: "Simple Reader"`를 설정하여 아이폰 Safari에서 홈 화면에 추가 시 전체 화면 독립 앱으로 동작.
-
-3. **하이브리드 능동 회선 판독기 및 무한 스피너 방어 (`useNetworkStatus.ts`, `Providers.tsx`, `Header.tsx`)**
-   - `navigator.onLine` 초기값 0초 컷 동기 심검 후, 가짜 온라인 신호나 서비스 워커의 위조 캐시에 속지 않도록 `/manifest.json?_t=${Date.now()}`에 대해 `method: "HEAD", cache: "no-store"`(1.2초 타임아웃) 능동 핑을 15초 주기 및 `onfocus`/`ononline` 이벤트마다 실행하여 실제 통신 여부를 정확히 판독함.
-   - `Providers.tsx`에 `@tanstack/react-query`의 `QueryClientProvider`를 장착하여 오프라인 감지 시 즉각 네트워크 재시도(`retry: 0` / `false`)를 0초 컷 차단, 초기 무한 스피너를 폭파하고 로컬 캐시로 즉시 진입함. 온라인 회복 시에는 `refetchOnReconnect: true` 및 `SessionProvider`의 `refetchWhenOffline={false}` 설정을 통해 최신 데이터로 실시간 자동 회복됨.
-   - 오프라인 감지 시 헤더 좌측에 `cloud_off` 아이콘 + "오프라인" 텍스트의 빨간색 펄스 뱃지를 표시하여 즉각적인 시각 피드백 제공.
-
-4. **서비스 워커 캐시 수동 업데이트 (앱 정보 모달)**
-   - 앱 정보 모달 하단에 "최신 버전으로 업데이트" 버튼을 배치.
-   - `navigator.serviceWorker.getRegistrations()`으로 모든 SW 등록 해제 → `caches.keys()`로 모든 캐시 스토리지 삭제 → `window.location.reload()`로 강제 새로고침.
-   - IndexedDB(Dexie.js)에 저장된 PDF 데이터와 메모/책갈피는 영향을 받지 않으며, SW 캐시(HTML/JS/CSS)만 초기화됨.
-
-### **6. 아키텍처 보안 하드닝 및 4단계 방어 설계 (Security & Hardening)**
-클라이언트(브라우저) 환경과 서버리스 API 경계 간의 철저한 격리 및 방어를 위해 4단계 보안 점검 체크리스트를 완수하여 무결성을 확보했습니다.
-
-1. **서버 엔드포인트 인가(Authorization) 및 Zod 입력 검증**
-   - **리소스 소유권 보호:** 모든 API 라우트(`app/api/drive/list`, `app/api/drive/download`, `app/api/translate`)는 클라이언트가 보낸 파라미터를 무조건 신뢰하지 않고 오직 서버 측 세션(`await auth()`)에서 검증된 자격증명(`accessToken` 및 세션 존재 여부)만을 기준으로 API 및 서비스 접근을 통제합니다. 특히 `/api/translate` 엔드포인트에 `auth()` 검증을 의무 도입하여 비인가 사용자가 서버의 `GEMINI_API_KEY`를 직접 남용하는 취약점을 해소했습니다.
-   - **엄격한 Zod 스키마 검증:** `zod` 라이브러리를 도입하여 모든 요청의 Body 및 Query Params(`fileId`, `folderId`, `text`, `mode`, `model` 등)에 대해 `.safeParse()`를 통한 정규화·검증을 강제 적용하고, 규격 외 요청 시 즉시 HTTP 400 에러를 반환합니다.
-   - **에러 메시지 위생화(Error Sanitization):** 외부 통신 실패나 내부 예외 시 상세 스택 트레이스 및 오류 원문은 오직 터미널·서버 로그(`console.error`)에만 기록하고, 브라우저로 반환되는 응답문은 **`"요청을 처리할 수 없습니다."`**로 규격을 100% 통일하여 내부 정보 누출을 봉쇄했습니다.
-
-2. **환경변수 격리(Zero-Leak) 및 비밀자격 관리**
-   - **백엔드 시크릿 노출 방지:** `GEMINI_API_KEY`, `GOOGLE_CLIENT_SECRET`, `NEXTAUTH_SECRET`, `SUPABASE_URL`, `SUPABASE_ANON_KEY` 등 기밀 서비스 시크릿에 `NEXT_PUBLIC_` 접두사가 유출되지 않는지 정기 검증(Zero-Leak)합니다. 
-   - **서버 API 프록시 동기화(Server-Proxy Sync):** 다중 앱이 하나의 Supabase를 공유하는 구조적 특성을 고려하여, 브라우저가 직접 DB 통신을 하던 기존 방식을 폐기하고 **Next.js 백엔드(`/api/metadata/sync`)를 경유하는 프록시 아키텍처**로 전면 개편했습니다. 브라우저는 `NEXT_PUBLIC_` 키 없이 오직 자체 API 서버와만 통신하며, 서버가 `auth()` 세션 기반으로 유저 신원을 강제 검증한 뒤에만 안전하게 Supabase 데이터를 읽고 씁니다.
-
-3. **PWA 오프라인 캐시 및 인증 토큰 로컬 보안 (Cache Purging)**
-   - **인증 토큰 격리:** Access Token 및 JWT 세션은 `localStorage`나 `IndexedDB`에 평문으로 절대 저장하지 않고 오직 NextAuth가 제어하는 **HttpOnly 암호화 쿠키**로 보호합니다.
-   - **로그아웃 시 민감 캐시 폭파 방어막:** 공공 장소나 타인 기기에서 사용자 로그아웃(`Header.tsx`)을 하거나 토큰 만료(`Workspace.tsx`) 이벤트 발생 시 **`window.caches.keys()`를 순회하여 `window.caches.delete`로 서비스 워커가 저장해둔 로컬 오프라인 캐시 스토리지까지 완벽히 클리어·파괴**하는 핸들러 로직을 적용했습니다. (오프라인 사용 중에는 원래대로 서비스 워커 캐싱 100% 정상 작동)
-
-4. **Vercel 배포용 6대 철통 HTTP 보안 헤더 (`next.config.ts`)**
-   - `next.config.ts`의 `async headers()` 설정을 통해 전역 라우트(`/:path*`)에 다음 **6대 강력 보안 헤더**를 자동으로 삽입하여 공격 시도를 원천 봉쇄합니다.
-     - **`Content-Security-Policy` (CSP):** `connect-src`, `font-src`, `img-src` 및 `script-src`, `style-src` 등에 필수 외부 도메인(`https://*.gstatic.com`, `https://*.googleapis.com`, `https://*.googleusercontent.com`, `https://*.ggpht.com` 등)과 `worker-src`/`child-src` CDN(`unpkg.com`, `cdn.jsdelivr.net`)을 개방하여 서비스 워커의 백그라운드 폰트/아바타 Fetch 및 PC/모바일 PDF CDN 웹 워커 구동이 차단되지 않도록 보장하면서 불법적인 Cross-Site 통신을 완벽 차단합니다.
-     - **`Strict-Transport-Security` (HSTS):** `max-age=63072000; includeSubDomains; preload` (무조건 HTTPS 암호화 통신 강제).
-     - **`X-Frame-Options`:** `DENY` (타 사이트 iframe 인가 차단 및 클릭재킹 방어).
-     - **`X-Content-Type-Options`:** `nosniff` (MIME 스푸핑 통제).
-     - **`Referrer-Policy`:** `strict-origin-when-cross-origin` (민감 경로 및 파라미터 유출 막기).
-     - **`Permissions-Policy`:** `camera=(), microphone=(), geolocation=()` (불필요 하드웨어 권한 조기 제한).
+### **핵심 시나리오별 검증 체크포인트**
+1. **Google OAuth 로그인 및 자동 세션 복구**:
+   - 우측 상단 `Google 로그인` 클릭 후 `drive.readonly` 권한을 승인합니다.
+   - 브라우저 개발자 도구(F12) Application -> Cookies에서 `authjs.session-token`이 180일 유효기간의 HttpOnly 쿠키로 발행되었는지 확인합니다.
+2. **자체 Picker 및 로컬 캐싱 (0.1초 렌더링)**:
+   - `드라이브 파일 열기`를 눌러 폴더를 탐색하고 핀(`[📌]`)을 클릭해 '내 서재'로 지정합니다.
+   - PDF를 열람한 후 브라우저 새로고침을 수행했을 때, 다운로드 로딩 없이 IndexedDB(`SimpleReaderDB -> pdfCache`)에서 **0.1초 만에 즉각 렌더링**되는지 확인합니다.
+3. **텍스트 드래그 및 Gemini 실시간 스트리밍**:
+   - 본문 영어 텍스트를 마우스나 터치로 드래그하여 플로팅 툴팁의 `한국어로 번역`을 클릭합니다.
+   - 우측 AI 패널에서 실시간으로 글자가 타이핑되듯 스트리밍 출력되는지 확인합니다.
+   - '선택된 문장' 좌측의 시계(히스토리) 아이콘을 눌러 방금 번역한 내역이 등록되었는지 확인하고, 클릭 시 복원되는지 검증합니다.
+4. **하이브리드 메타데이터 동기화 (Server Proxy)**:
+   - 번역 내용을 메모로 저장하거나 상단 책갈피 버튼을 클릭합니다.
+   - 네트워크 탭에서 브라우저가 Supabase로 직접 통신하지 않고, **`POST /api/metadata/sync`**를 호출하여 정상적으로 200 응답을 받는지 확인합니다.
+   - Supabase 콘솔 대시보드의 `pdf_metadata` 테이블에 데이터가 정상 등록되었는지 검증합니다.
+5. **휴지통 모드 및 복구 테스트**:
+   - 작성한 메모나 책갈피를 삭제합니다. 목록에서 즉시 사라지는 것을 확인합니다.
+   - 상단 휴지통 아이콘을 클릭하여 휴지통 모드로 전환하고, 삭제된 항목이 목록에 나타나는지 확인합니다.
+   - '복구하기' 버튼을 클릭하면 원래 목록으로 복원되고 Supabase의 `deleted_at`이 `null`로 초기화되는지 확인합니다.
+6. **오프라인 모드 및 로컬 파일 격리 테스트**:
+   - 개발자 도구 Network 탭을 `Offline`으로 전환합니다. 헤더 좌측에 빨간색 `오프라인` 배지가 펄스 애니메이션으로 나타나는지 확인합니다.
+   - 캐시된 PDF가 끊김 없이 열리고, 오프라인 상태에서 작성한 메모에 '구름(동기화 대기)' 표시가 뜨는지 확인합니다.
+   - 네트워크를 다시 `Online`으로 복구했을 때 10분 주기 폴링 또는 수동 동기화 버튼을 통해 구름 표시가 사라지며 서버로 업로드되는지 검증합니다.
+7. **앱 정보 모달 인터랙션**:
+   - 헤더 좌측의 로고 아이콘이나 `Simple Reader` 글자를 클릭해 모달이 정상 팝업되는지 확인합니다.
+   - 다크/라이트 테마 전환 시 모달 상단 앱 아이콘 색상이 조화롭게 바뀌는지 확인합니다.
+   - 하단 좌측의 `개인정보처리방침` 링크 클릭 시 새 탭으로 올바르게 열리는지 확인합니다.
